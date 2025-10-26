@@ -505,7 +505,6 @@ def optimize_protein_design(
     align_to="all",
     scale_temp_by_plddt=False,
     partial_diffusion=0.0,
-    cycle_templates=False,
     pde_cutoff_intra=1.5,
     pde_cutoff_inter=3.0,
     omit_AA=None,
