@@ -16,9 +16,9 @@ source $(conda info --base)/etc/profile.d/conda.sh
 conda activate boltz_ph
 
 # Install boltz
-if [ -d "boltz2" ]; then
+if [ -d "boltz" ]; then
     echo "📂 Installing Boltz..."
-    cd boltz2
+    cd boltz
     pip install -e .
     cd ..
 else
@@ -32,18 +32,25 @@ conda install -c anaconda ipykernel -y
 # Install Python dependencies
 echo "🔧 Installing Python dependencies..."
 pip install matplotlib seaborn prody tqdm PyYAML requests pypdb py3Dmol logmd==0.1.45
+pip install ml_collections
 
 # Install PyRosetta
 echo "⏳ Installing PyRosetta (this may take a while)..."
 pip install pyrosettacolabsetup pyrosetta-installer
 python -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'
 
+
+# ✅ Fix NumPy + Numba compatibility (PyRosetta downgrades NumPy to 1.23)
+echo "🩹 Fixing NumPy/Numba version for Boltz and diffusion..."
+pip install --upgrade "numpy>=1.24,<1.27" numba
+
+
 # Download Boltz weights and dependencies
 echo "⬇️  Downloading Boltz weights and dependencies..."
 python -c "
-from boltz2.main import download_boltz2
+from boltz.main import download_boltz2
 from pathlib import Path
-cache = Path('~/.boltz2').expanduser()
+cache = Path('~/.boltz').expanduser()
 cache.mkdir(parents=True, exist_ok=True)
 download_boltz2(cache)
 print('✅ Boltz weights downloaded successfully!')
@@ -58,7 +65,7 @@ if [ -d "LigandMPNN" ]; then
 fi
 
 # Make DAlphaBall.gcc executable
-chmod +x "boltzdesign/DAlphaBall.gcc" || { echo -e "Error: Failed to chmod DAlphaBall.gcc"; exit 1; }
+chmod +x "boltz/utils/DAlphaBall.gcc" || { echo -e "Error: Failed to chmod DAlphaBall.gcc"; exit 1; }
 
 # Setup Jupyter kernel for the environment
 echo "📓 Setting up Jupyter kernel..."
