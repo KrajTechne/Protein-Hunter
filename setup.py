@@ -37,14 +37,14 @@ class PostInstallCommand(install):
             print(f"⚠️  Warning: Could not chmod DAlphaBall.gcc: {e}")
 
 setup(
-    name='boltz-design',
+    name='protein-hunter',
     version='0.1.0',
-    description='Boltz protein structure prediction and design environment',
-    long_description=open('README.md').read() if Path('README.md').exists() else 'Boltz protein structure prediction and design environment',
+    description='Protein Hunter',
+    long_description=open('README.md').read() if Path('README.md').exists() else 'Protein Hunter',
     long_description_content_type='text/markdown',
-    author='Your Name',
-    author_email='your.email@example.com',
-    url='https://github.com/yourusername/boltz-design',
+    author='Yehlin Cho',
+    author_email='yehlin@mit.edu',
+    url='https://github.com/yehlincho/Protein-Hunter',
     packages=find_packages(include=['boltz*']),
     include_package_data=True,
     python_requires='>=3.10,<3.11',
