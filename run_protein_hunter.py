@@ -2,7 +2,7 @@ import subprocess
 
 # protein binding design
 cmd = [
-    "python", "boltz/design.py",
+    "python", "boltz_ph/design.py",
     "--num_designs", "3",
     "--num_cycles", "7",
     "--protein_seqs", "AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE",
@@ -20,7 +20,7 @@ subprocess.run(cmd, check=True)
 
 #multimer binding design
 cmd = [
-    "python", "boltz/design.py",
+    "python", "boltz_ph/design.py",
     "--num_designs", "3",
     "--num_cycles", "7",
     "--protein_seqs", "AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE:AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE",
@@ -36,10 +36,9 @@ cmd = [
 ]
 subprocess.run(cmd, check=True)
 
-
 #protein binder with contact residues
 cmd = [
-    "python", "boltz/design.py",
+    "python", "boltz_ph/design.py",
     "--num_designs", "3",
     "--num_cycles", "7",
     "--protein_seqs", "AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE",
@@ -59,7 +58,7 @@ subprocess.run(cmd, check=True)
 
 #protein + small molecule binding design
 cmd = [
-    "python", "boltz/design.py",
+    "python", "boltz_ph/design.py",
     "--num_designs", "3",
     "--num_cycles", "7",
     "--protein_seqs", "AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE",
@@ -80,7 +79,7 @@ subprocess.run(cmd, check=True)
 
 #nucleic acid binding design
 cmd = [
-    "python", "boltz/design.py",
+    "python", "boltz_ph/design.py",
     "--num_designs", "3",
     "--num_cycles", "7",
     "--gpu_id", "2",
