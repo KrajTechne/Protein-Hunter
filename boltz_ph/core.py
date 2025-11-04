@@ -35,7 +35,7 @@ from utils.alphafold_utils import run_alphafold_step
 from utils.pyrosetta_utils import run_rosetta_step
 
 
-class ProteinHunter:
+class ProteinHunter_Boltz:
     """
     Core class to manage the protein design pipeline, including Boltz structure
     prediction, LigandMPNN design, cycle optimization, and downstream validation.
@@ -55,12 +55,14 @@ class ProteinHunter:
         self.designer = LigandMPNNWrapper("./LigandMPNN/run.py")
 
         # 3. Setup Directories
-        self.save_dir = args.save_dir if args.save_dir else f"./results_boltz/{args.name}"
+        self.save_dir = (
+            args.save_dir if args.save_dir else f"./results_boltz/{args.name}"
+        )
         self.protein_hunter_save_dir = f"{self.save_dir}/0_protein_hunter_design"
         os.makedirs(self.save_dir, exist_ok=True)
         os.makedirs(self.protein_hunter_save_dir, exist_ok=True)
 
-        print("✅ ProteinHunter initialized.")
+        print("✅ ProteinHunter_Boltz initialized.")
 
     def _load_boltz_model(self):
         """Loads and configures the Boltz model."""
@@ -237,7 +239,9 @@ class ProteinHunter:
                     smart_split(a.template_chain_id) if a.template_chain_id else []
                 )
                 template_cif_chain_id_list = (
-                    smart_split(a.template_cif_chain_id) if a.template_cif_chain_id else []
+                    smart_split(a.template_cif_chain_id)
+                    if a.template_cif_chain_id
+                    else []
                 )
                 template_files = [get_cif(tp) for tp in template_path_list]
                 for i, template_file in enumerate(template_files):
@@ -673,7 +677,7 @@ class ProteinHunter:
 
     def run_pipeline(self):
         ""
-        "Orchestrates the entire protein design and validation pipeline."""
+        "Orchestrates the entire protein design and validation pipeline."
         # 1. Prepare Base Data
         base_data, pocket_conditioning = self._build_initial_data_dict()
 

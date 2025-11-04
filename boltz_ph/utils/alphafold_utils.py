@@ -1532,7 +1532,6 @@ def process_yaml_files(
                     template_dict["ids"] = template_ids
                     template_dict["cif_ids"] = template_cif_ids
                 all_protein_templates.append(template_dict)
-        print("all_protein_templates", all_protein_templates)
 
 
         # Process MSAs for each protein; ensure each gets a formatted sequence
@@ -1584,7 +1583,6 @@ def process_yaml_files(
             "version": 1,
         }
         # Add proteins
-        print("all_protein_templates", all_protein_templates)
         for i, (seq, chain) in enumerate(zip(all_protein_seqs, all_protein_ids)):
             # Find matching template(s) for this chain, if any. Only match if ids contains chain.
             matched_template = next((tpl for tpl in all_protein_templates if "ids" in tpl and chain in tpl["ids"]), None)

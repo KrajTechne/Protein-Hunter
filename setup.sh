@@ -11,14 +11,22 @@ if ! command -v conda &> /dev/null; then
     exit 1
 fi
 
+# Initialize conda for bash shell
+eval "$(conda shell.bash hook)"
+
 # ------------------------------------------------------------------------------
 # 2️⃣ Create and activate environment
 # ------------------------------------------------------------------------------
 echo "📦 Creating conda environment..."
 conda create -n proteinhunter python=3.10 -y
-source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate proteinhunter
 
+# Verify we're in the right environment
+echo "📍 Active environment: $CONDA_DEFAULT_ENV"
+if [ "$CONDA_DEFAULT_ENV" != "proteinhunter" ]; then
+    echo "❌ Failed to activate proteinhunter environment"
+    exit 1
+fi
 # ------------------------------------------------------------------------------
 # 3️⃣ Install Boltz
 # ------------------------------------------------------------------------------
@@ -42,7 +50,7 @@ conda install -c anaconda ipykernel -y
 # 5️⃣ Install Python dependencies
 # ------------------------------------------------------------------------------
 echo "🔧 Installing Python dependencies..."
-pip install matplotlib seaborn prody tqdm PyYAML requests pypdb py3Dmol logmd==0.1.45
+pip install matplotlib seaborn prody tqdm PyYAML requests pypdb py3Dmol py2Dmol logmd==0.1.45
 pip install ml_collections
 
 # ------------------------------------------------------------------------------

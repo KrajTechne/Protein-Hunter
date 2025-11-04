@@ -17,7 +17,19 @@ def sample_seq(length: int, exclude_P: bool = True, frac_X: float = 0.0) -> str:
   random.shuffle(seq_list)
   return "".join(seq_list)
 
-def extract_sequence_from_pdb(pdb_path, chain_id):
+
+# Amino acid conversion dict
+restype_3to1 = {
+    'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
+    'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
+    'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
+    'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y',
+    'MSE': 'M',
+}
+
+
+
+def extract_sequence_from_structure(pdb_path, chain_id):
     """Extract sequence from PDB file"""
     structure = gemmi.read_structure(str(pdb_path))
 
@@ -33,15 +45,6 @@ def extract_sequence_from_pdb(pdb_path, chain_id):
 
     raise ValueError(f"Chain {chain_id} not found in {pdb_path}")
 
-
-# Amino acid conversion dict
-restype_3to1 = {
-    'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-    'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-    'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-    'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y',
-    'MSE': 'M',
-}
 
 def extend(a, b, c, L, A, D):
     """
@@ -468,6 +471,41 @@ def optimize_protein_design(
         - Protein-ligand binder design (target_seq = SMILES)
     """
 
+    """
+    Optimize protein design through iterative folding and sequence design.
+
+    Args:
+        folder: ChaiFolder instance
+        designer: LigandMPNNWrapper instance
+        initial_seq: Initial sequence to optimize
+        target_seq: Target (protein sequence OR SMILES for ligand). If None with target_pdb, extracts from PDB.
+        target_pdb: Optional template PDB
+        target_chain: Chain ID in template PDB (required if target_pdb provided)
+        prefix: Output file prefix
+        n_steps: Number of optimization steps
+        num_trunk_recycles: Trunk recycles per fold
+        num_diffn_timesteps: Diffusion timesteps
+        num_diffn_samples: Number of Diffusion samples per step
+        temperature: MPNN sampling temperature
+        use_esm: Use ESM for binder/unconditional (all iterations)
+        use_esm_target: Use ESM for target protein (all iterations, ignored for ligands)
+        use_alignment: Enable alignment during diffusion
+        scale_temp_by_plddt: Scale MPNN temperature by inverse pLDDT
+        partial_diffusion: Use partial diffusion refinement
+        pde_cutoff_intra: Intra-chain PDE cutoff (Å)
+        pde_cutoff_inter: Inter-chain PDE cutoff (Å)
+        omit_AA: Amino acids to exclude from MPNN
+        randomize_template_sequence: Randomize template sequence identity
+        cyclic: Enable cyclic topology
+        final_validation: Run final fold without templates
+        verbose: Print detailed progress
+
+    Supports:
+        - Unconditional design (no target)
+        - Protein-protein binder design
+        - Protein-ligand binder design (target_seq = SMILES)
+    """
+
     # Extract target sequence from PDB if not provided
     if target_pdb is not None and target_seq is None:
         if target_chain is None:
@@ -600,21 +638,6 @@ def optimize_protein_design(
 
         folder.prep_inputs(chains)
         folder.get_embeddings()
-
-        if viewer is not None and viewer._atom_types is None:
-          # PATCH 9 (GLOBAL): self.state.batch -> self._current_batch
-          # Use state.batch_inputs which is guaranteed to be present after prep_inputs
-          token_exists = folder.state.batch_inputs["token_exists_mask"][0]
-          n_total = token_exists.sum().item()
-          if is_binder_design:
-            n_binder = len(seq)
-            n_target = n_total - n_binder
-            if is_ligand_target:
-              viewer._atom_types = ["L"] * n_target + ["P"] * n_binder
-            else:
-              viewer._atom_types = ["P"] * n_target + ["P"] * n_binder
-            viewer._chains = ["A"] * n_target + ["B"] * n_binder
-
         folder.run_trunk(num_trunk_recycles=num_trunk_recycles,
                          template_weight=template_weight)
 

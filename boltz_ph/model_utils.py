@@ -1,25 +1,23 @@
 import gc
-import json
 import os
 import random
-import subprocess
 import sys
 import warnings
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
+import gemmi
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import py3Dmol
 import torch
 from prody import parsePDB
-import gemmi
 
 from boltz.data.feature.featurizer import BoltzFeaturizer
 from boltz.data.feature.featurizerv2 import Boltz2Featurizer
-from boltz.data.mol import load_molecules, load_canonicals
+from boltz.data.mol import load_molecules
 from boltz.data.msa.mmseqs2 import run_mmseqs2
 from boltz.data.parse.a3m import parse_a3m
 from boltz.data.parse.schema import parse_boltz_schema
@@ -43,9 +41,6 @@ from boltz.main import (
 )
 from boltz.model.models.boltz1 import Boltz1
 from boltz.model.models.boltz2 import Boltz2
-from Bio.PDB import MMCIFParser, PDBParser
-from Bio.PDB.PDBIO import PDBIO
-import logging
 
 # Existing filter
 warnings.filterwarnings("ignore", message=".*requires_grad=True.*")
@@ -110,6 +105,7 @@ def get_CA(x):
                     z = float(line[46 : 46 + 8])
                     xyz.append([x, y, z])
     return np.array(xyz)
+
 
 def binder_binds_contacts(
     pdb_path, binder_chain, target_chain, contact_residues, cutoff=10.0
@@ -178,14 +174,29 @@ def sample_seq(length: int, exclude_P: bool = True, frac_X: float = 0.0) -> str:
     return "".join(seq_list)
 
 
-
 # Amino acid conversion dict
 restype_3to1 = {
-    'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-    'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-    'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-    'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y',
-    'MSE': 'M',
+    "ALA": "A",
+    "CYS": "C",
+    "ASP": "D",
+    "GLU": "E",
+    "PHE": "F",
+    "GLY": "G",
+    "HIS": "H",
+    "ILE": "I",
+    "LYS": "K",
+    "LEU": "L",
+    "MET": "M",
+    "ASN": "N",
+    "PRO": "P",
+    "GLN": "Q",
+    "ARG": "R",
+    "SER": "S",
+    "THR": "T",
+    "VAL": "V",
+    "TRP": "W",
+    "TYR": "Y",
+    "MSE": "M",
 }
 
 
@@ -201,7 +212,7 @@ def extract_sequence_from_structure(pdb_path, chain_id):
                     res_name = residue.name.strip().upper()
                     if res_name in restype_3to1:
                         seq.append(restype_3to1[res_name])
-                return ''.join(seq)
+                return "".join(seq)
 
     raise ValueError(f"Chain {chain_id} not found in {pdb_path}")
 

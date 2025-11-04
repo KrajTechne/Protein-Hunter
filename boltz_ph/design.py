@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from core import ProteinHunter
+from core import ProteinHunter_Boltz
 
 
 # Keep parse_args() here for CLI functionality
@@ -40,8 +40,12 @@ def parse_args():
     parser.add_argument(
         "--template_path", default="", type=str
     )  # can be "2VSM", or path(s) to .cif/.pdb, multiple allowed separated by comma
-    parser.add_argument("--template_chain_id", default="", type=str) # for prediction, the chain id to use for the template
-    parser.add_argument("--template_cif_chain_id", default="", type=str) # for mmCIF files, the chain id to use for the template (for alignment)
+    parser.add_argument(
+        "--template_chain_id", default="", type=str
+    )  # for prediction, the chain id to use for the template
+    parser.add_argument(
+        "--template_cif_chain_id", default="", type=str
+    )  # for mmCIF files, the chain id to use for the template (for alignment)
     parser.add_argument("--no_potentials", action="store_true")
     parser.add_argument("--diffuse_steps", default=200, type=int)
     parser.add_argument("--recycling_steps", default=3, type=int)
@@ -115,7 +119,7 @@ def parse_args():
 def main():
     args = parse_args()
     # Instantiate the main class and run the pipeline
-    protein_hunter = ProteinHunter(args)
+    protein_hunter = ProteinHunter_Boltz(args)
     protein_hunter.run_pipeline()
 
 

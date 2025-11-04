@@ -106,6 +106,50 @@ def copy_dict_of_tensors(d):
     return out
 
 
+def extract_viewer_metadata(batch_inputs, token_mask=None):
+    """
+    Extract chain IDs and atom types for visualization from batch inputs.
+
+    Args:
+        batch_inputs: Dictionary containing token-level metadata
+        token_mask: Optional boolean mask for valid tokens
+
+    Returns:
+        tuple: (chains, atom_types) - lists for each token
+    """
+    # Get token-level metadata
+    token_asym_id = batch_inputs["token_asym_id"].squeeze(0).cpu().numpy()
+    token_entity_type = batch_inputs["token_entity_type"].squeeze(0).cpu().numpy()
+
+    # Apply mask if provided
+    if token_mask is not None:
+        token_mask_np = (
+            token_mask.cpu().numpy() if hasattr(token_mask, "cpu") else token_mask
+        )
+        token_asym_id = token_asym_id[token_mask_np]
+        token_entity_type = token_entity_type[token_mask_np]
+
+    # Convert asym_id to chain letters (0->A, 1->B, etc.)
+    chains = [chr(65 + int(asym_id)) for asym_id in token_asym_id]
+
+    # Convert entity_type to atom_types for py2Dmol
+    # EntityType values: PROTEIN=1, RNA=2, DNA=3, LIGAND=5
+    atom_types = []
+    for entity_type in token_entity_type:
+        if entity_type == EntityType.PROTEIN.value:
+            atom_types.append("P")
+        elif entity_type == EntityType.RNA.value:
+            atom_types.append("R")
+        elif entity_type == EntityType.DNA.value:
+            atom_types.append("D")
+        elif entity_type == EntityType.LIGAND.value:
+            atom_types.append("L")
+        else:
+            atom_types.append("P")  # Default to protein
+
+    return chains, atom_types
+
+
 # ==============================================================================
 # PATCH 1: Update FoldingState dataclass (Lines 214-238)
 # ==============================================================================
@@ -903,8 +947,14 @@ class ChaiFolder:
                 coords = (
                     denoised_pos.squeeze(0).cpu()[bb_idx_cpu][:, 1, :].float().numpy()
                 )
-                L = coords.shape[0]
-                viewer.add(coords)
+
+                # Extract chain IDs and atom types for proper visualization
+                token_mask_cpu = self.state.batch_inputs["token_exists_mask"].squeeze(0)
+                chains, atom_types = extract_viewer_metadata(
+                    self.state.batch_inputs, token_mask_cpu
+                )
+
+                viewer.add(coords, chains=chains, atom_types=atom_types)
 
         return atom_pos
 
@@ -1025,8 +1075,18 @@ class ChaiFolder:
                     )
 
                     plddts = result["plddt"].cpu().float().numpy() * 100.0
-                    L = coords.shape[0]
-                    viewer.add(coords, plddts=plddts)
+
+                    # Extract chain IDs and atom types for proper visualization
+                    token_mask_cpu = self.state.batch_inputs[
+                        "token_exists_mask"
+                    ].squeeze(0)
+                    chains, atom_types = extract_viewer_metadata(
+                        self.state.batch_inputs, token_mask_cpu
+                    )
+
+                    viewer.add(
+                        coords, plddts=plddts, chains=chains, atom_types=atom_types
+                    )
 
                 if (
                     best_result is None

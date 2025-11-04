@@ -51,33 +51,71 @@ We have implemented two different AF3-style models in our Protein Hunter pipelin
 
 
 ## Run Code End-to-End
+
+1️⃣ **End-to-end structure and sequence generation**  
+👉 See example usage in `run_protein_hunter.py` for reference. 🐍✨  
+This will take you from an initial input to final designed protein structures and sequences, all in one pipeline!
+
+> ⚠️ **Caution:** The original evaluation in the paper used an all-X sequence for initial design. However, to increase the diversity of generated folds, you can mix random amino acids with X residues by setting the `percent_X` parameter (e.g., `--percent_X 50` for 50% X and 50% random AAs). Adjusting this ratio helps explore a broader design space.
+
+## Protein Hunter (Boltz Edition ⚡) 
+
 - **Protein-protein design:**  
   To design a protein-protein complex, run:  
   ```
-  python boltz/protein_hunter.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 2 --name PDL1_mix_aa --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
+  python boltz_ph/design.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 2 --name PDL1_mix_aa --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
   ```
 
-
-## Protein Hunter (Boltz Edition ⚡) 
 - **Small molecule binder design:**  
-  For designing a protein binder for a small molecule (e.g. SAM), use:  
+  For designing a protein binder for a small molecule (e.g., SAM), use:  
   ```
-  python boltz/run.py --num_designs 5 --num_cycles 7 --ligand_ccd SAM --ligand_id B --gpu_id 2 --name SAM_binder --min_design_protein_length 130 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
+  python boltz_ph/design.py --num_designs 5 --num_cycles 7 --ligand_ccd SAM --ligand_id B --gpu_id 2 --name SAM_binder --min_design_protein_length 130 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
   ```
 
 - **DNA/RNA PDB design:**  
-  To design a protein binder for a nucleic acid (e.g. an RNA sequence), run this in Python:
+  To design a protein binder for a nucleic acid (e.g., an RNA sequence), run:
   ```
-  python boltz/run.py --num_designs 5 --num_cycles 7 --nucleic_seq AGAGAGAGA --nucleic_id B --nucleic_type rna --gpu_id 0 --name RNA_bind --min_design_protein_length 130 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
+  python boltz_ph/design.py --num_designs 5 --num_cycles 7 --nucleic_seq AGAGAGAGA --nucleic_id B --nucleic_type rna --gpu_id 0 --name RNA_bind --min_design_protein_length 130 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
   ```
 
 - **Designs with multiple/heterogeneous target types:**  
-  If you want to target multiple, different types of molecules (for example, a protein with a ligand and a template), run:
+  Want to target multiple types of molecules (e.g., a protein with a ligand and a template)? Run:
   ```
-  python one_shot_diff/run.py --num_designs 5 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --ligand_ccd SAM --ligand_id C --gpu_id 0 --name PDL1_SAM --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.8 --use_msa_for_af3 --plot
+  python boltz_ph/design.py --num_designs 5 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --ligand_ccd SAM --ligand_id C --gpu_id 0 --name PDL1_SAM --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.8 --use_msa_for_af3 --plot
   ```
 
 ## Protein Hunter (Chai Edition ☕) 
+
+> ⚠️ **Caution:** The Chai version is under active development. Current features include support for multiple chains, full AlphaFold (AF3) validation, and ongoing improvements. Expect rapid changes and new features in upcoming releases.
+
+- **Unconditional protein design:**  
+  Generate de novo proteins of a desired length:
+  ```
+  python chai_ph/design.py --jobname unconditional_design --length 120 --percent_X 0 --seq "" --target_seq ACDEFGHIKLMNPQRSTVWY --cyclic --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 2
+  ```
+
+- **Protein binder design:**  
+  To design a binder for a specific protein target (e.g., PDL1):
+  ```
+  python chai_ph/design.py --jobname PDL1_binder --length 120 --percent_X 50 --seq "" --target_seq AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 2
+  ```
+
+- **Cyclic protein binder design:**  
+  Design a cyclic peptide binder for a specific protein target:
+  ```
+  python chai_ph/design.py --jobname PDL1_cyclic_binder --length 120 --percent_X 50 --seq "" --cyclic --target_seq AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 2
+  ```
+
+- **Small molecule (ligand) binder design:**  
+  To design a protein binder for a small molecule or ligand (SMILES string as target):
+  ```
+  python chai_ph/design.py --jobname ligand_binder --length 120 --percent_X 0 --seq "" --target_seq O=C(NCc1cocn1)c1cnn(C)c1C(=O)Nc1ccn2cc(nc2n1)c1ccccc1 --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode esm --repredict --omit_aa "" --temperature 0.01 --scale_temp_by_plddt --render_freq 100 --gpu_id 2
+  ```
+
+2️⃣ **Refine your own designs!**  
+🛠️ You can provide your initial designs as input and further improve their structure by iteratively redesigning and predicting the structure. Repeat as needed for optimal results!
+
+
 
 ⚠️ **Warning**: To run the AlphaFold3 cross-validation pipeline, you need to specify your AlphaFold3 directory, Docker name, database settings, and conda environment in the configuration. These can be set using the following arguments:
 - `--alphafold_dir`: Path to your AlphaFold3 installation (default: ~/alphafold3)
