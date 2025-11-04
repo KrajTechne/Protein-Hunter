@@ -117,8 +117,7 @@ This will take you from an initial input to final designed protein structures an
 
 See the code in `refiner.ipynb` for example usage.
 
-
-
+---
 
 ⚠️ **Warning**: To run the AlphaFold3 cross-validation pipeline, you need to specify your AlphaFold3 directory, Docker name, database settings, and conda environment in the configuration. These can be set using the following arguments:
 - `--alphafold_dir`: Path to your AlphaFold3 installation (default: ~/alphafold3)
