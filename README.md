@@ -11,14 +11,15 @@
 </p>
 
 > 📄 **Paper**: [Protein Hunter: exploiting structure hallucination
-within diffusion for protein design](https://www.biorxiv.org/content/10.1101/2025.10.10.681530v2.full.pdf)  
-> 🚀 **Colab**: https://colab.research.google.com/drive/1JBP7iMPLKiJrhjUlFfi0ShQcu8vHn2gI#scrollTo=CzE1iBF-ZCI0
-
+within diffusion for protein design](https://www.biorxiv.org/content/10.1101/2025.10.10.681530v2.full.pdf)
 ---
 
 
 ## 📝 Colab Notebook
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/yehlincho/Protein-Hunter/blob/main/protein_hunter_chai_colab.ipynb)
+
+[![Open Protein Hunter (Chai)](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/yehlincho/Protein-Hunter/blob/main/protein_hunter_chai_colab.ipynb)
+[![Open Protein Hunter (Boltz)](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/yehlincho/Protein-Hunter/blob/main/protein_hunter_boltz_colab.ipynb)
+
 
 ## 🚀 Quick Start
 
