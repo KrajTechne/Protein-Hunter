@@ -216,8 +216,11 @@ def get_boltz_model(
     # Setup steering parameters
     steering_args = BoltzSteeringParams()
     if no_potentials:
+        print("no potentials")
         steering_args.fk_steering = False
         steering_args.guidance_update = False
+    else:
+        print("use potentials")
 
     # Setup pairformer arguments
     pairformer_args = (

@@ -78,7 +78,7 @@ def parse_args():
     parser.add_argument("--contact_residues", default="", type=str)
     parser.add_argument("--omit_AA", default="C", type=str)
     parser.add_argument("--exclude_P", action="store_true", default=False)
-    parser.add_argument("--frac_X", default=0.5, type=float)
+    parser.add_argument("--percent_X", default=80, type=int)
     parser.add_argument(
         "--plot",
         action="store_true",

@@ -366,7 +366,7 @@ class ProteinHunter_Boltz:
 
         # Set initial binder sequence
         initial_seq = sample_seq(
-            binder_length, exclude_P=a.exclude_P, frac_X=a.frac_X
+            binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100
         )
         update_binder_sequence(initial_seq)
         print(f"Binder initial sequence length: {binder_length}")
@@ -423,10 +423,11 @@ class ProteinHunter_Boltz:
                 break
 
             # Resample initial sequence
-            new_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.frac_X)
+            new_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100)
             update_binder_sequence(new_seq)
             clean_memory()
 
+        clean_memory() # <-- ADD THIS CALL HERE
         # Capture Cycle 0 metrics
         binder_chain_idx = CHAIN_TO_NUMBER[a.binder_chain]
         pair_chains = output["pair_chains_iptm"]
