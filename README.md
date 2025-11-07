@@ -78,14 +78,14 @@ To use AlphaFold3 validation, make sure your AlphaFold3 Docker is installed, spe
 - **Protein-protein design with all X sequence:**  
   To design a protein-protein complex using an all-X sequence (i.e., X for every residue, encouraging de novo exploration), run:  
   ```
-  python boltz_ph/design.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 2 --name PDL1_mix_aa_all_X --percent_X 100 --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
+  python boltz_ph/design.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 0 --name PDL1_mix_aa_all_X --percent_X 100 --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
   ```
   > 💡 **Tip:** The `--percent_X 100` flag ensures all positions use the X (unknown) amino acid code.
 
 - **Protein-protein design (mixed X and random amino acids):**  
   To design a protein-protein complex using a mix of X and random amino acids for the designable chain, run:  
   ```
-  python boltz_ph/design.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 2 --name PDL1_mix_aa --percent_X 50 --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
+  python boltz_ph/design.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 0 --name PDL1_mix_aa --percent_X 50 --min_design_protein_length 90 --max_design_protein_length 150 --high_iptm_threshold 0.7 --use_msa_for_af3 --plot
   ```
 
 - **Protein-protein contact specification design:**  
@@ -103,7 +103,7 @@ To use AlphaFold3 validation, make sure your AlphaFold3 Docker is installed, spe
 
 - **Cyclic peptide binder design**
   ```
-  python boltz_ph/design.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 0 --name PDL1_mix_aa --min_design_protein_length 10 --max_design_protein_length 20 --high_iptm_threshold 0.8 --use_msa_for_af3 --plot --cyclic
+  python boltz_ph/design.py --num_designs 3 --num_cycles 7 --protein_seqs AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --protein_ids B --protein_msas "" --gpu_id 0 --name PDL1_cyclic_peptide_binder --min_design_protein_length 10 --max_design_protein_length 20 --high_iptm_threshold 0.8 --percent_X 100 --use_msa_for_af3 --plot --cyclic
   ```
 
 - **Small molecule binder design:**  
@@ -133,18 +133,18 @@ To use AlphaFold3 validation, make sure your AlphaFold3 Docker is installed, spe
 - **Unconditional protein design:**  
   Generate de novo proteins of a desired length:
   ```
-  python chai_ph/design.py --jobname unconditional_design --length 120 --percent_X 0 --seq "" --target_seq ACDEFGHIKLMNPQRSTVWY --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 2 --plot
+  python chai_ph/design.py --jobname unconditional_design --length 120 --percent_X 0 --seq "" --target_seq ACDEFGHIKLMNPQRSTVWY --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 0 --plot
 
 - **Protein binder design:**  
   To design a binder for a specific protein target (e.g., PDL1):
   ```
-  python chai_ph/design.py --jobname PDL1_binder --length 120 --percent_X 80 --seq "" --target_seq AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 2 --use_msa_for_af3 --plot
+  python chai_ph/design.py --jobname PDL1_binder --length 120 --percent_X 80 --seq "" --target_seq AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 0 --use_msa_for_af3 --plot
   ```
 
 - **Cyclic peptide binder design:**  
   Design a cyclic peptide binder for a specific protein target:
   ```
-  python chai_ph/design.py --jobname PDL1_cyclic_binder --length 120 --percent_X 80 --seq "" --cyclic --target_seq AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 2 --use_msa_for_af3 --plot
+  python chai_ph/design.py --jobname PDL1_cyclic_binder --length 120 --percent_X 80 --seq "" --cyclic --target_seq AFTVTVPKDLYVVEYGSNMTIECKFPVEKQLDLAALIVYWEMEDKNIIQFVHGEEDLKVQHSSYRQRARLLKDQLSLGNAALQITDVKLQDAGVYRCMISYGGADYKRITVKVNAPYAAALE --n_trials 1 --n_cycles 5 --n_recycles 3 --n_diff_steps 200 --hysteresis_mode templates --repredict --omit_aa "" --temperature 0.1 --scale_temp_by_plddt --render_freq 100 --gpu_id 0 --use_msa_for_af3 --plot
   ```
 
 - **Small molecule (ligand) binder design:**  
