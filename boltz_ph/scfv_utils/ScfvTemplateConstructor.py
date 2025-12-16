@@ -1,5 +1,10 @@
 import os
 import numpy as np
+import biotite
+import biotite.sequence as seq
+import biotite.structure as struc
+import biotite.structure.io.pdb as pdb
+import biotite.structure.io.pdbx as pdbx
 import py2Dmol
 
 class ScfvTemplateConstructor:
@@ -21,7 +26,32 @@ class ScfvTemplateConstructor:
         viewer = py2Dmol.view()
         viewer.add_pdb(pdb_file_path)
         return viewer.show()
-
+    
+    def extract_chain_sequences(self):
+        """ Extract sequences for chains A and B from the PDB file """
+        seq_obj = seq.ProteinSequence()
+        
+        # Account for possibility that input path may not be PDB. Could be PDB or mmCIF
+        if self.fv_pdb_path.endswith('.pdb'):
+            struc_file = pdb.PDBFile.read(self.fv_pdb_path)
+            struc_atom_array = pdb.get_structure(struc_file, model = 1) # Get first model (Assumption: only one model present)
+        elif self.fv_pdb_path.endswith('.cif'):
+            struc_file = pdbx.CIFFile.read(self.fv_pdb_path)
+            struc_atom_array = pdbx.get_structure(struc_file, model = 1) #
+    
+        # Extract sequences for each chain from structure atom array
+        chain_ids = np.unique(struc_atom_array.chain_id)
+        seq_dict = {}
+        paired_seq = ""
+        for chain_id in chain_ids:
+            chain_atoms = struc_atom_array[struc_atom_array.chain_id == chain_id]
+            aa_pos, aa3_list = struc.get_residues(chain_atoms)
+            chain_aa1_seq = ''.join([seq_obj.convert_letter_3to1(aa3) for aa3 in aa3_list])
+            seq_dict[chain_id] = chain_aa1_seq
+            paired_seq += chain_aa1_seq
+        
+        return seq_dict, paired_seq
+    
     def create_sc_pdb_file(self, output_file_path, linker_length=20):
         """ Writes a single chain of a PDB file to a new file, 
             with an optional linker of specified linker length added between first chain's last residue and second chain's first residue."""
@@ -57,3 +87,14 @@ class ScfvTemplateConstructor:
                 file.write(line)
             file.write('END\n')
         print(f"Written to {output_file_path}")
+    
+    def create_protein_hunter_inputs(self, output_file_path, linker_length=20):
+        """ Creates the single chain PDB file and extract seq input for Protein Hunter inputs """
+        
+        self.create_sc_pdb_file(output_file_path=output_file_path, linker_length=linker_length)
+        
+        # Assuming Redesign area only restricted to linker region for now
+        seq_dict, paired_seq = self.extract_chain_sequences()
+        protein_hunter_mutated_seq = "X" * linker_length
+        seq_input = protein_hunter_mutated_seq.join(chain_seq for chain_seq in seq_dict.values())
+        return seq_dict, paired_seq, seq_input
