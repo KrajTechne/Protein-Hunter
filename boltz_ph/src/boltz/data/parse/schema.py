@@ -1657,6 +1657,7 @@ def parse_boltz_schema(  # noqa: C901, PLR0915, PLR0912
 
         # Get relevant template chain ids
         if pdb:
+            # Has an outdatated parameter: ignore_ligands=True. Keeping for now, but should be removed in future.
             parsed_template = parse_pdb(
                 path,
                 mols=ccd,
