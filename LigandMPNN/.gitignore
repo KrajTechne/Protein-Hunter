@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Ignore Model Weight Files (large files with .pt or .pth extensions)
+*.pt
+*.pth
