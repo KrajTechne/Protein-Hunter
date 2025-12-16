@@ -43,6 +43,7 @@ class InputDataBuilder:
         self.save_dir = (
             args.save_dir if args.save_dir else f"./results_boltz/{args.name}"
         )
+        # Future Change: so future runs do not overwrite previous runs
         self.protein_hunter_save_dir = f"{self.save_dir}/0_protein_hunter_design"
         os.makedirs(self.protein_hunter_save_dir, exist_ok=True)
 
@@ -76,8 +77,10 @@ class InputDataBuilder:
         if a.mode == "unconditional":
             data = self._build_unconditional_data()
             pocket_conditioning = False
-        else:
+        elif a.mode == "binder":
             data, pocket_conditioning = self._build_conditional_data()
+        elif a.mode == "partial_redesign":
+            data, pocket_conditioning = self._build_partial_redesign_data()
 
         # Sort sequences by chain ID for consistent processing
         data["sequences"] = sorted(
@@ -102,8 +105,126 @@ class InputDataBuilder:
             ]
         }
         return data
+    
+    def _build_partial_redesign_data(self):
+        """Constructs data for partial redesign (binder + target + optional non-protein)."""
+        
+        a = self.args
+        protein_seqs_list, protein_msas_list = (
+            self._process_sequence_inputs()
+        )
+        
+        sequences = []
+        
+        # Assign chain IDs to proteins first
+        protein_chain_ids = [chr(ord('B') + i) for i in range(len(protein_seqs_list))]
+        
+        # Find next available chain letter
+        next_chain_idx = len(protein_chain_ids)
+        
+        ligand_chain_id = None
+        if a.ligand_smiles or a.ligand_ccd:
+            ligand_chain_id = chr(ord('B') + next_chain_idx)
+            next_chain_idx += 1
+            
+        nucleic_chain_id = None
+        if a.nucleic_seq:
+            nucleic_chain_id = chr(ord('B') + next_chain_idx)
+            next_chain_idx += 1
+        # --- END NEW ---
 
+        # Step 1: Determine canonical MSA for each unique target sequence
+        seq_to_indices = defaultdict(list)
+        for idx, seq in enumerate(protein_seqs_list):
+            if seq:
+                seq_to_indices[seq].append(idx)
+        
+        seq_to_final_msa = {}
+        for seq, idx_list in seq_to_indices.items():
+            chosen_msa = next(
+                (
+                    protein_msas_list[i]
+                    for i in idx_list
+                ),
+                None
+            )
+            chosen_msa = chosen_msa if chosen_msa is not None else ""
 
+            if chosen_msa == "mmseqs":
+                pid = protein_chain_ids[idx_list[0]]
+                msa_value = process_msa(pid, seq, Path(self.protein_hunter_save_dir))
+                seq_to_final_msa[seq] = str(msa_value)
+            elif chosen_msa == "empty":
+                seq_to_final_msa[seq] = "empty"
+            else:
+                raise ValueError(f"Invalid msa_mode: {a.msa_mode}")
+
+        # Step 2: Build sequences list for target proteins
+        for i, (seq, msa) in enumerate(zip(protein_seqs_list, protein_msas_list)):
+            if not seq:
+                continue
+            pid = protein_chain_ids[i]
+            final_msa = seq_to_final_msa.get(seq, "empty")
+            sequences.append(
+                {
+                    "protein": {
+                        "id": [pid],
+                        "sequence": seq,
+                        "msa": final_msa,
+                    }
+                }
+            )
+
+        # Step 3: Add binder chain
+        sequences.append(
+            {
+                "protein": {
+                    "id": ["A"], # Hardcoded 'A'
+                    "sequence": "X",
+                    "msa": "empty",
+                    "cyclic": a.cyclic,
+                }
+            }
+        )
+
+        # Step 4: Add ligands/nucleic acids
+        if a.ligand_smiles:
+            sequences.append(
+                {"ligand": {"id": [ligand_chain_id], "smiles": a.ligand_smiles}}
+            )
+        elif a.ligand_ccd:
+            sequences.append({"ligand": {"id": [ligand_chain_id], "ccd": a.ligand_ccd}})
+        if a.nucleic_seq:
+            sequences.append(
+                {a.nucleic_type: {"id": [nucleic_chain_id], "sequence": a.nucleic_seq}}
+            )
+
+        # Step 5: Add templates (Conditional only allows templates for target proteins)
+        # Modification allow templates for binder and target proteins
+        protein_binder_chain_ids = ['A'] + protein_chain_ids # Include binder chain 'A' in first position as template assignment is based on order of appearance
+        templates = self._build_templates(protein_binder_chain_ids)
+
+        data = {"sequences": sequences}
+        if templates:
+            data["templates"] = templates
+
+        # Step 6: Add constraints (pocket conditioning)
+        pocket_conditioning = bool(a.contact_residues and a.contact_residues.strip())
+        if pocket_conditioning:
+            contacts = []
+            residues_chains = a.contact_residues.split("|")
+            for i, residues_chain in enumerate(residues_chains):
+                residues = residues_chain.split(",")
+                contacts.extend([
+                    [protein_chain_ids[i], int(res)]
+                    for res in residues
+                    if res.strip() != ""
+                ])
+            constraints = [{"pocket": {"binder": "A", "contacts": contacts}}]
+            data["constraints"] = constraints
+
+        return data, pocket_conditioning
+    
     def _build_conditional_data(self):
         """Constructs data for conditioned design (binder + target + optional non-protein)."""
         a = self.args
@@ -431,8 +552,13 @@ class ProteinHunter_Boltz:
                 break
 
             # Resample initial sequence
-            new_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100)
-            update_binder_sequence(new_seq)
+            # If partial redesign, keep binder seq the same
+            if a.mode != "partial_redesign":
+                new_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100)
+                update_binder_sequence(new_seq)
+            else:
+                new_seq = initial_seq # Keep same seq for partial redesign
+                print(f"Resampled binder sequence: {new_seq}")
             clean_memory()
 
         clean_memory() # <-- ADD THIS CALL HERE

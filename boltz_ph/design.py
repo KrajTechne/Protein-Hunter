@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument("--grad_enabled", action="store_true", default=False)
     parser.add_argument("--name", default="target_name_is_missing", type=str)
     parser.add_argument(
-        "--mode", default="binder", choices=["binder", "unconditional"], type=str
+        "--mode", default="binder", choices=["binder", "unconditional", "partial_redesign"], type=str
     )
     parser.add_argument("--num_designs", default=50, type=int)
     parser.add_argument("--num_cycles", default=5, type=int)
