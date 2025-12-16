@@ -131,3 +131,6 @@ dmypy.json
 # Ignore Model Weight Files (large files with .pt or .pth extensions)
 *.pt
 *.pth
+
+# Ignore testing_scripts directory
+testing_scripts/
