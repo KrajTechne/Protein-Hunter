@@ -1,6 +1,8 @@
 import os
+from pydoc import doc
 import numpy as np
 import biotite
+import gemmi
 import biotite.sequence as seq
 import biotite.structure as struc
 import biotite.structure.io.pdb as pdb
@@ -88,13 +90,50 @@ class ScfvTemplateConstructor:
             file.write('END\n')
         print(f"Written to {output_file_path}")
     
+    def convert_pdb_to_cif(self, input_pdb_path):
+        """Adapts the logic from Boltz's parse_pdb to convert a PDB file to mmCIF."""
+        
+        print(f"Reading PDB: {input_pdb_path}")
+        output_cif_path = input_pdb_path.replace('.pdb', '.cif')
+        
+        # 1. Read the structure using Gemmi
+        structure = gemmi.read_structure(input_pdb_path)
+        structure.setup_entities()
+        
+        # 2. Apply the subchain renaming logic (Copied from Boltz source)
+        # This ensures chains are correctly named for mmCIF format (e.g., handling multiple segments)
+        subchain_counts, subchain_renaming = {}, {}
+        for chain in structure[0]:
+            subchain_counts[chain.name] = 0
+            for res in chain:
+                if res.subchain not in subchain_renaming:
+                    subchain_renaming[res.subchain] = chain.name + str(subchain_counts[chain.name] + 1)
+                    subchain_renaming[res.subchain] = str(subchain_counts[chain.name] + 1) # Simplified renaming
+                    subchain_counts[chain.name] += 1
+                res.subchain = subchain_renaming[res.subchain]
+            
+        # Update entities with new subchain names
+        for entity in structure.entities:
+            entity.subchains = [subchain_renaming.get(subchain, subchain) for subchain in entity.subchains]
+
+        # 3. Create mmCIF document and write to file
+        doc = structure.make_mmcif_document()
+        doc.write_file(output_cif_path)
+    
+        print(f"✅ Converted to CIF: {output_cif_path}")
+        return output_cif_path
+    
     def create_protein_hunter_inputs(self, output_file_path, linker_length=20):
         """ Creates the single chain PDB file and extract seq input for Protein Hunter inputs """
         
+        # Create single chain PDB file with linker
         self.create_sc_pdb_file(output_file_path=output_file_path, linker_length=linker_length)
         
+        # Convert to mmCIF format
+        output_cif_path = self.convert_pdb_to_cif(input_pdb_path=output_file_path)
+
         # Assuming Redesign area only restricted to linker region for now
         seq_dict, paired_seq = self.extract_chain_sequences()
         protein_hunter_mutated_seq = "X" * linker_length
         seq_input = protein_hunter_mutated_seq.join(chain_seq for chain_seq in seq_dict.values())
-        return seq_dict, paired_seq, seq_input
+        return seq_dict, paired_seq, seq_input, output_cif_path
