@@ -2,7 +2,7 @@ import numpy as np
 import antpack
 from antpack import PairedChainAnnotator
 from Bio import SeqIO
-from scfv_utils.general_utils import get_seqs_from_fasta
+from boltz_ph.scfv_utils.general_utils import get_seqs_from_fasta
 import os
 import sys
 
