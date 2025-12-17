@@ -282,4 +282,4 @@ class ScfvTemplateConstructor:
         print("Number of Fixed Residues:", len(final_fixed_designable_dict['fixed']))
         print("Number of Designable Residues:", len(final_fixed_designable_dict['designable']))
         print("✅ Created Protein Hunter Inputs")
-        return seq_dict, paired_seq, seq_input, output_cif_path, sc_res_designable_dict
+        return seq_dict, paired_seq, seq_input, output_cif_path, final_fixed_designable_dict
