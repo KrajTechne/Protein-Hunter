@@ -17,6 +17,8 @@ from boltz_ph.constants import CHAIN_TO_NUMBER
 from utils.metrics import get_CA_and_sequence # Used implicitly in design.py
 from utils.convert import calculate_holo_apo_rmsd, convert_cif_files_to_pdb
 
+from boltz_ph.scfv_utils.ScfvTemplateConstructor import ScfvTemplateConstructor 
+
 
 from model_utils import (
     binder_binds_contacts,
@@ -478,17 +480,22 @@ class ProteinHunter_Boltz:
             protein_chain_ids = sorted({chain for chain, _ in data_cp["constraints"][0]["pocket"]["contacts"]})
 
         # Helper function to update sequence in the data dictionary
-        def update_binder_sequence(new_seq):
+        def update_binder_sequence(new_seq, template_path: str = None):
+            """ Updates the binder sequence in the data dictionary. Also, updates template path if provided. """
+            # Update template path if provided
+            if template_path:
+                # Also update path to template if provided
+                for seq_entry in data_cp["sequences"]:
+                    if seq_entry['chain_id'] == self.binder_chain:
+                        seq_entry['cif'] = os.path.abspath(template_path)
+            # Update sequence
             for seq_entry in data_cp["sequences"]:
-                if (
-                    "protein" in seq_entry
-                    and self.binder_chain in seq_entry["protein"]["id"]
-                ):
+                if ("protein" in seq_entry and self.binder_chain in seq_entry["protein"]["id"]):
                     seq_entry["protein"]["sequence"] = new_seq
-                    return
-            # Should not happen if data_cp is built correctly
+                    return new_seq    
+             # Should not happen if data_cp is built correctly
             raise ValueError("Binder chain not found in data dictionary.")
-
+        
         # Set initial binder sequence
         if a.seq =="":
             initial_seq = sample_seq(
@@ -496,7 +503,7 @@ class ProteinHunter_Boltz:
             )
         else:
             initial_seq = a.seq
-        update_binder_sequence(initial_seq)
+        updated_seq = update_binder_sequence(initial_seq)
         print(f"Binder initial sequence length: {binder_length}")
 
         # --- Cycle 0 structure prediction, with contact filtering check ---
@@ -545,10 +552,12 @@ class ProteinHunter_Boltz:
                     contact_check_okay = True  # Fail open
 
             if contact_check_okay:
+                designable_residues_indices = [index for index, aa in enumerate(updated_seq) if aa == 'X']
                 print(f"✅ Binder contacts at least 2 of required residues: {a.contact_residues} after cycle 0.")
                 break
             contact_filter_attempt += 1
             if contact_filter_attempt >= a.max_contact_filter_retries:
+                designable_residues_indices = [index for index, aa in enumerate(updated_seq) if aa == 'X']
                 print("WARNING: Max retries for contact filtering reached. Proceeding.")
                 break
 
@@ -556,9 +565,16 @@ class ProteinHunter_Boltz:
             # If partial redesign, keep binder seq the same
             if a.mode != "partial_redesign":
                 new_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100)
-                update_binder_sequence(new_seq)
+                _ = update_binder_sequence(new_seq)
             else:
-                new_seq = initial_seq # Keep same seq for partial redesign
+                probs_dict = {'fixed': 0.0, 'variable': a.variable_prob, 'designable': 1.01} # Setting variable to 0.999 enforces only CDRs as fixed residues
+                scfv_constructor = ScfvTemplateConstructor(fv_pdb_path= a.input_pdb_path)
+                output_file_path = a.input_pdb_path.replace(".pdb", "_sc_ph_template.pdb")
+                _, _, seq_input, output_cif_path, sc_res_designable_dict = scfv_constructor.create_protein_hunter_inputs(output_file_path=output_file_path, 
+                                                                                                                         linker_length=a.linker_length,
+                                                                                                                         probs_dict=probs_dict)
+                new_seq = seq_input
+                _ = update_binder_sequence(new_seq, template_path=output_cif_path)
                 print(f"Resampled binder sequence: {new_seq}")
             clean_memory()
 
@@ -623,12 +639,20 @@ class ProteinHunter_Boltz:
             seq = seq_str.split(":")[CHAIN_TO_NUMBER[self.binder_chain]] 
 
             # Update data_cp with new sequence
-            alanine_count = seq.count("A")
-            alanine_percentage = (
-                alanine_count / binder_length if binder_length != 0 else 0.0
-            )
-            update_binder_sequence(seq) # Use the helper function
-
+            # Alanine content calculation: Critical for filtering and updating best structure, but is dependent on design mode
+            if a.mode != "partial_redesign": # For unconditional and binder design, since we redesign whole sequence
+                alanine_count = seq.count("A")
+                alanine_percentage = (
+                    alanine_count / binder_length if binder_length != 0 else 0.0
+                )
+            elif a.mode == "partial_redesign": # For partial redesign, only consider residues actually designed.
+                designed_seq = ''.join([seq[i] for i in designable_residues_indices])
+                alanine_count = designed_seq.count("A")
+                alanine_percentage = (
+                    alanine_count / len(designed_seq) if len(designed_seq) != 0 else 0.0
+                )
+            
+            _ = update_binder_sequence(seq) # Use the helper function
             # 2. Structure Prediction
             output, structure = run_prediction(
                 data_cp,
