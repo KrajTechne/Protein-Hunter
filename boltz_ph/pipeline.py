@@ -545,6 +545,7 @@ class ProteinHunter_Boltz:
                     contact_check_okay = True  # Fail open
 
             if contact_check_okay:
+                print(f"✅ Binder contacts at least 2 of required residues: {a.contact_residues} after cycle 0.")
                 break
             contact_filter_attempt += 1
             if contact_filter_attempt >= a.max_contact_filter_retries:
@@ -612,6 +613,7 @@ class ProteinHunter_Boltz:
                 "chains_to_design": self.binder_chain,
                 "omit_AA": f"{a.omit_AA},P" if cycle == 0 else a.omit_AA,
                 "bias_AA": f"A:{alpha}" if a.alanine_bias else "",
+                "fixed_residues": a.fixed_residues,
             }
 
             seq_str, logits = design_sequence(

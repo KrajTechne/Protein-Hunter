@@ -79,7 +79,12 @@ def parse_args():
         type=str,
         help="Specify which target chain residues must contact the binder (currently only supports protein contacts). For more than two chains, separate by |, e.g., '1,2,5,10 | 3,5,10'."
     )
-
+    parser.add_argument(
+        "--fixed_residues",
+        type=str,
+        default="",
+        help="Provide fixed residues, A12 A13 A14 B2 B25",
+    )
     parser.add_argument(
         "--no_contact_filter",
         action="store_true",
