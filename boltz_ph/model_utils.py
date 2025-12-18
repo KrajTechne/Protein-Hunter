@@ -61,9 +61,9 @@ def get_cif(cif_code=""):
     Returns the local filename (relative path) to the CIF for the provided code or file.
     Checks local directory and fetches from RCSB or AlphaFold if needed.
     """
-    print("working directory:", os.getcwd())
-    print("cif_code:", cif_code)
-    print("os.path.isfile(cif_code):", os.path.isfile(cif_code))
+    #print("working directory:", os.getcwd())
+    #print("cif_code:", cif_code)
+    #print("os.path.isfile(cif_code):", os.path.isfile(cif_code))
     if cif_code is None or cif_code == "":
         print("Error: No cif code specified and uploads not supported in CLI mode.")
         sys.exit(1)

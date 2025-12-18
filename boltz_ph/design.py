@@ -116,6 +116,16 @@ def parse_args():
     parser.add_argument("--alanine_bias", action="store_true")
     parser.add_argument("--high_iptm_threshold", default=0.8, type=float)
     parser.add_argument("--high_plddt_threshold", default=0.8, type=float)
+
+    # Params for Partial Redesign: 
+    # Reinitializing the sequence and template construction if do not meet desired contact threshold at cycle 0
+    # (e.g., if fewer than 2 of the specified contact residues are contacted by the designed binder)
+    parser.add_argument("--variable_prob", default = 0.7, type=float, 
+                        help = "Probability of keeping residue mutable in partial redesign mode. 0.0 = fixed, 1.0 = designable.")
+    parser.add_argument("--input_pdb_path", default = "", type=str, 
+                        help = "Path to input PDB file for partial redesign mode.")
+    parser.add_argument("--linker_length", default = 20, type=int, 
+                        help = "Length of the linker to be used in constructing the single chain template for partial redesign.")
     # --- End Existing Arguments ---
 
     return parser.parse_args()
