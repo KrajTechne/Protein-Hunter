@@ -485,7 +485,7 @@ class ProteinHunter_Boltz:
             # Update template path if provided
             if template_path:
                 # Also update path to template if provided
-                for seq_entry in data_cp["sequences"]:
+                for seq_entry in data_cp["templates"]:
                     if seq_entry['chain_id'] == self.binder_chain:
                         seq_entry['cif'] = os.path.abspath(template_path)
             # Update sequence
