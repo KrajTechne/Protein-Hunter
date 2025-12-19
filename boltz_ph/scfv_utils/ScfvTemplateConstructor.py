@@ -70,7 +70,7 @@ class ScfvTemplateConstructor:
         annotated_paired_seq  = self.scfv_annotator.annotate_seqs(linker_dict, orientation_dict, target_dict={}, generate_motif_commands= False)
         return annotated_paired_seq
     
-    def create_fixed_designable_variable_indices(self, annotated_paired_seq: dict, linker_length: int =20, cdr_extend: int = 3):
+    def create_fixed_designable_variable_indices(self, annotated_paired_seq: dict, linker_length: int =20, cdr_extend: int = 2):
         """ Creates fixed, designable, and variable residues indices based on annotated paired sequence """
 
         if self.orientation == "VH-VL":
