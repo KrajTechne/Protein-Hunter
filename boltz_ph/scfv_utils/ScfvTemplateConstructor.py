@@ -128,6 +128,9 @@ class ScfvTemplateConstructor:
         # For Linker region
         indices_dict['designable'] = list(range(first_chain_length + 1, first_chain_length + linker_length + 1))
 
+        # Convert Paratope Residues Indices to a string format for Protein Hunter input (separated by commas)
+        paratope_indices_str = ','.join([str(i) for i in paratope_indices])
+
         #print("Fixed indices:", indices_dict['fixed'])
         #print("Designable indices:", indices_dict['designable'])
         #print("Variable indices:", indices_dict['variable'])
@@ -135,7 +138,7 @@ class ScfvTemplateConstructor:
         #print(f"Number of Fixed Residues: {len(indices_dict['fixed'])}")
         #print(f"Number of Designable Residues: {len(indices_dict['designable'])}")
         #print(f"Number of Variable Residues: {len(indices_dict['variable'])}")
-        return indices_dict, paratope_indices
+        return indices_dict, paratope_indices_str
     
     def create_final_fixed_designable_dict(self, fixed_designable_variable_indices: dict, probs_dict: dict):
         """ Creates final fixed and designable dict for Protein Hunter input based on fixed, designable, and variable indices """
@@ -286,7 +289,7 @@ class ScfvTemplateConstructor:
         # Create single chain PDB file with linker
         seq_input = self.create_sc_pdb_file(output_file_path=output_file_path, res_designable_dict= sc_res_designable_dict, linker_length=linker_length)
         
-        # Convert to mmCIF format
+        # 5. Convert to mmCIF format
         output_cif_path = self.convert_pdb_to_cif(input_pdb_path=output_file_path)
 
         print("Number of Fixed Residues:", len(final_fixed_designable_dict['fixed']))
