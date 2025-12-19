@@ -80,6 +80,12 @@ def parse_args():
         help="Specify which target chain residues must contact the binder (currently only supports protein contacts). For more than two chains, separate by |, e.g., '1,2,5,10 | 3,5,10'."
     )
     parser.add_argument(
+        "--paratope_residues",
+        type=str,
+        default="",
+        help="Provide paratope residues on the binder chain to focus design, e.g.,'32,50,91'. Ensure separation by commas without spaces.",
+    )
+    parser.add_argument(
         "--fixed_residues",
         type=str,
         default="",

@@ -538,6 +538,7 @@ class ProteinHunter_Boltz:
                         self.binder_chain,
                         protein_chain_ids[i],
                         contact_res,
+                        paratope_residues = a.paratope_residues,
                         cutoff=a.contact_cutoff,
                     )
                     for i, contact_res in enumerate(a.contact_residues.split("|"))
@@ -748,6 +749,7 @@ class ProteinHunter_Boltz:
                         self.binder_chain,
                         protein_chain_ids[i],
                         contact_res,
+                        paratope_residues = a.paratope_residues,
                         cutoff=a.contact_cutoff,
                     )
                     for i, contact_res in enumerate(a.contact_residues.split("|"))

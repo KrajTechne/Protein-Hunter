@@ -106,9 +106,7 @@ def get_CA(x):
     return np.array(xyz)
 
 
-def binder_binds_contacts(
-    pdb_path, binder_chain, target_chain, contact_residues, cutoff=10.0
-):
+def binder_binds_contacts(pdb_path, binder_chain, target_chain, contact_residues, paratope_residues: str = "", cutoff=10.0):
     """
     Returns True if at least 2 contact residues on target_chain
     are contacted by any CA atom of binder_chain within cutoff angstroms.
@@ -132,7 +130,7 @@ def binder_binds_contacts(
                 ca_resnums.append(atom.getResnum())
         return ca_atoms, ca_resnums
 
-    binder_ca_atoms, _ = get_chain_ca_atoms_and_resnums(binder_chain)
+    binder_ca_atoms, binder_resnums = get_chain_ca_atoms_and_resnums(binder_chain)
     target_ca_atoms, target_resnums = get_chain_ca_atoms_and_resnums(target_chain)
 
     if len(binder_ca_atoms) == 0 or len(target_ca_atoms) == 0:
@@ -141,7 +139,13 @@ def binder_binds_contacts(
     binder_coords = np.array([atom.getCoords() for atom in binder_ca_atoms])
     target_coords = np.array([atom.getCoords() for atom in target_ca_atoms])
 
-
+    # Filter binder coordinates to only paratope residues if specified
+    if paratope_residues != "":
+        paratope_residues = [int(x) for x in paratope_residues.split(",") if x.strip()]
+        paratope_indices = [i for i, resnum in enumerate(binder_resnums) if resnum in paratope_residues]
+        binder_coords = binder_coords[paratope_indices]
+    
+    # Get indices of contact residues on target chain
     contact_indices = [
         i for i, resnum in enumerate(target_resnums) if resnum in contact_residues
     ]
