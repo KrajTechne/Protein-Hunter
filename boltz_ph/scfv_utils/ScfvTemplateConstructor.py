@@ -70,7 +70,7 @@ class ScfvTemplateConstructor:
         annotated_paired_seq  = self.scfv_annotator.annotate_seqs(linker_dict, orientation_dict, target_dict={}, generate_motif_commands= False)
         return annotated_paired_seq
     
-    def create_fixed_designable_variable_indices(self, annotated_paired_seq: dict, linker_length: int =20):
+    def create_fixed_designable_variable_indices(self, annotated_paired_seq: dict, linker_length: int =20, cdr_extend: int = 3):
         """ Creates fixed, designable, and variable residues indices based on annotated paired sequence """
 
         if self.orientation == "VH-VL":
@@ -90,6 +90,7 @@ class ScfvTemplateConstructor:
         #print(f"Total Length: {first_chain_length + sec_chain_length + linker_length}")
 
         indices_dict = {'fixed': [], 'designable': [], 'variable': []}
+        paratope_indices = []
 
         for chain, chain_dict in target_annotation_chains.items():
     
@@ -115,6 +116,14 @@ class ScfvTemplateConstructor:
                     indices_dict['variable'].extend(adjusted_indices_list)
                 elif "cdr" in region:
                     indices_dict['fixed'].extend(adjusted_indices_list)
+
+                    # Extract residues potentially responsible for binding (extend CDRs by cdr_extend on both sides, within chain limits)
+                    # Aim: Capture potential paratope residues and pass to Protein Hunter to ensure contact check only occurs with these residues and target epitope
+                    extended_start = max(start - cdr_extend, 0) # Ensure start does not go below 0
+                    extended_end = min(end + cdr_extend, len(chain_dict['seq']) - 1) # Ensure end does not exceed chain length - 1
+                    extended_zero_indices_list = list(range(extended_start, extended_end + 1))
+                    extended_adjusted_indices_list = [i + residue_offset for i in extended_zero_indices_list]
+                    paratope_indices.extend(extended_adjusted_indices_list)
         
         # For Linker region
         indices_dict['designable'] = list(range(first_chain_length + 1, first_chain_length + linker_length + 1))
@@ -126,7 +135,7 @@ class ScfvTemplateConstructor:
         #print(f"Number of Fixed Residues: {len(indices_dict['fixed'])}")
         #print(f"Number of Designable Residues: {len(indices_dict['designable'])}")
         #print(f"Number of Variable Residues: {len(indices_dict['variable'])}")
-        return indices_dict
+        return indices_dict, paratope_indices
     
     def create_final_fixed_designable_dict(self, fixed_designable_variable_indices: dict, probs_dict: dict):
         """ Creates final fixed and designable dict for Protein Hunter input based on fixed, designable, and variable indices """
@@ -262,7 +271,7 @@ class ScfvTemplateConstructor:
         print(f"✅ Converted to CIF: {output_cif_path}")
         return output_cif_path
     
-    def create_protein_hunter_inputs(self, output_file_path, linker_length=20, probs_dict: dict = {'fixed': 0.0, 'variable': 0.7, 'designable': 1.01}):
+    def create_protein_hunter_inputs(self, output_file_path, linker_length=20, cdr_extend: int = 3, probs_dict: dict = {'fixed': 0.0, 'variable': 0.7, 'designable': 1.01}):
         """ Creates the single chain PDB file and extract seq input for Protein Hunter inputs """
         
         # 1. Extract chain sequences
@@ -270,7 +279,8 @@ class ScfvTemplateConstructor:
         # 2. Annotate paired sequence
         annotated_paired_seq = self.annotate_paired_sequence(paired_seq)
         # 3. Create fixed/designable indices
-        fixed_designable_variable_indices = self.create_fixed_designable_variable_indices(annotated_paired_seq, linker_length=linker_length)
+        fixed_designable_variable_indices, paratope_indices = self.create_fixed_designable_variable_indices(annotated_paired_seq, linker_length=linker_length, 
+                                                                                                            cdr_extend=cdr_extend)
         # 4. Create Final Fixed and Designable Dict 
         final_fixed_designable_dict, sc_res_designable_dict = self.create_final_fixed_designable_dict(fixed_designable_variable_indices, probs_dict=probs_dict)
         # Create single chain PDB file with linker
@@ -282,4 +292,4 @@ class ScfvTemplateConstructor:
         print("Number of Fixed Residues:", len(final_fixed_designable_dict['fixed']))
         print("Number of Designable Residues:", len(final_fixed_designable_dict['designable']))
         print("✅ Created Protein Hunter Inputs")
-        return seq_dict, paired_seq, seq_input, output_cif_path, final_fixed_designable_dict
+        return seq_dict, paired_seq, seq_input, output_cif_path, final_fixed_designable_dict, paratope_indices
