@@ -571,7 +571,7 @@ class ProteinHunter_Boltz:
                 probs_dict = {'fixed': 0.0, 'variable': a.variable_prob, 'designable': 1.01} # Setting variable to 0.999 enforces only CDRs as fixed residues
                 scfv_constructor = ScfvTemplateConstructor(fv_pdb_path= a.input_pdb_path)
                 output_file_path = a.input_pdb_path.replace(".pdb", "_sc_ph_template.pdb")
-                _, _, seq_input, output_cif_path, sc_res_designable_dict = scfv_constructor.create_protein_hunter_inputs(output_file_path=output_file_path, 
+                _, _, seq_input, output_cif_path, _, _ = scfv_constructor.create_protein_hunter_inputs(output_file_path=output_file_path, 
                                                                                                                          linker_length=a.linker_length,
                                                                                                                          probs_dict=probs_dict)
                 new_seq = seq_input
