@@ -511,6 +511,8 @@ class ProteinHunter_Boltz:
         pdb_filename = ""
         structure = None
         output = None
+        # Set current fixed residues
+        current_fixed_residues = a.fixed_residues
 
         while True:
             output, structure = run_prediction(
@@ -571,10 +573,13 @@ class ProteinHunter_Boltz:
                 probs_dict = {'fixed': 0.0, 'variable': a.variable_prob, 'designable': 1.01} # Setting variable to 0.999 enforces only CDRs as fixed residues
                 scfv_constructor = ScfvTemplateConstructor(fv_pdb_path= a.input_pdb_path)
                 output_file_path = a.input_pdb_path.replace(".pdb", "_sc_ph_template.pdb")
-                _, _, seq_input, output_cif_path, _, _ = scfv_constructor.create_protein_hunter_inputs(output_file_path=output_file_path, 
+                _, _, seq_input, output_cif_path, index_dict, _, bias_aa_json = scfv_constructor.create_protein_hunter_inputs(output_file_path=output_file_path, 
                                                                                                                          linker_length=a.linker_length,
                                                                                                                          probs_dict=probs_dict)
+                # On the retry, need to update inputted seq, template cif file, and new set of fixed residues
                 new_seq = seq_input
+                updated_fixed_residues = index_dict['fixed']
+                current_fixed_residues = ' '.join([f"A{res}" for res in updated_fixed_residues])
                 _ = update_binder_sequence(new_seq, template_path=output_cif_path)
                 print(f"Resampled binder sequence: {new_seq}")
             clean_memory()
@@ -630,7 +635,9 @@ class ProteinHunter_Boltz:
                 "chains_to_design": self.binder_chain,
                 "omit_AA": f"{a.omit_AA},P" if cycle == 0 else a.omit_AA,
                 "bias_AA": f"A:{alpha}" if a.alanine_bias else "",
-                "fixed_residues": a.fixed_residues,
+                "fixed_residues": current_fixed_residues,
+                "model_weights_path" : a.model_weights_path,
+                "bias_AA_per_residue" : a.bias_AA_per_residue
             }
 
             seq_str, logits = design_sequence(

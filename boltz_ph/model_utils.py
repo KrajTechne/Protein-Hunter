@@ -584,7 +584,9 @@ def design_sequence(
     bias_AA="",
     temperature=0.02,
     return_logits=False,
-    fixed_residues = ""
+    fixed_residues = "",
+    model_weights_path = "",
+    bias_AA_per_residue = ""
 ):
     """Runs the LigandMPNN (or SolubleMPNN) sequence design wrapper."""
     seq, logits = designer.run(
@@ -595,10 +597,12 @@ def design_sequence(
         bias_AA=bias_AA,
         omit_AA=omit_AA,
         return_logits=return_logits,
+        model_weights_path=model_weights_path,
         extra_args={
             "--temperature": temperature,
             "--batch_size": 1,
             "--fixed_residues": fixed_residues,
+            "--bias_AA_per_residue": bias_AA_per_residue # Path to JSON File defining per-residue bias (High Positive means pick these options)
         },
     )
     if return_logits:

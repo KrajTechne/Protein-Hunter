@@ -92,6 +92,12 @@ def parse_args():
         help="Provide fixed residues, A12 A13 A14 B2 B25",
     )
     parser.add_argument(
+        "--bias_AA_per_residue",
+        type = str,
+        default = "",
+        help = "Provide bias for each residue in a JSON File. Provide path to JSON File as argument."
+    )
+    parser.add_argument(
         "--no_contact_filter",
         action="store_true",
         help="Do not filter or restart for unbound contact residues at cycle 0",
@@ -132,6 +138,11 @@ def parse_args():
                         help = "Path to input PDB file for partial redesign mode.")
     parser.add_argument("--linker_length", default = 20, type=int, 
                         help = "Length of the linker to be used in constructing the single chain template for partial redesign.")
+    
+    # Params for specifying path to model weights
+    parser.add_argument("--model_weights_path", default = "", type=str, 
+                        help = "Path to model weights folder")
+    
     # --- End Existing Arguments ---
 
     return parser.parse_args()
