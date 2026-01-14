@@ -23,6 +23,7 @@ class LigandMPNNWrapper:
         extra_args=None,
         fix_unk=True,
         return_logits=False,
+        model_weights_path = ""
     ):
         """
         Unified Ligand/ProteinMPNN runner.
@@ -72,9 +73,12 @@ class LigandMPNNWrapper:
             ]
 
             # --- Model checkpoint handling ---
-            run_py_path = os.path.abspath(self.run_py)
-            BASE_DIR = os.path.dirname(run_py_path)
-            MODEL_DIR = os.path.join(BASE_DIR, "model_params")
+            if model_weights_path == "":
+                run_py_path = os.path.abspath(self.run_py)
+                BASE_DIR = os.path.dirname(run_py_path)
+                MODEL_DIR = os.path.join(BASE_DIR, "model_params")
+            else:
+                MODEL_DIR = os.path.abspath(model_weights_path)
 
             if model_type == "protein_mpnn":
                 cmd += ["--checkpoint_protein_mpnn", os.path.join(MODEL_DIR, "proteinmpnn_v_48_020.pt")]
