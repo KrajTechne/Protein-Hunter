@@ -138,6 +138,8 @@ def parse_args():
                         help = "Path to input PDB file for partial redesign mode.")
     parser.add_argument("--linker_length", default = 20, type=int, 
                         help = "Length of the linker to be used in constructing the single chain template for partial redesign.")
+    parser.add_argument("--safe", default = True, type = bool,
+                        help = "If True, will fix CDRs and surrounding residues defined by CDR extend length")
     
     # Params for specifying path to model weights
     parser.add_argument("--model_weights_path", default = "", type=str, 
