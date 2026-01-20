@@ -71,7 +71,7 @@ class ScfvTemplateConstructor:
         annotated_paired_seq  = self.scfv_annotator.annotate_seqs(linker_dict, orientation_dict, target_dict={}, generate_motif_commands= False)
         return annotated_paired_seq
     
-    def create_fixed_designable_variable_array(self, annotated_paired_seq: dict, linker_length: int =20, cdr_extend: int = 2, risk = True):
+    def create_fixed_designable_variable_array(self, annotated_paired_seq: dict, linker_length: int =20, cdr_extend: int = 2, safe = True):
         """ Create a list of the linker length with fixed, variable, designable residues
             class_mapping = {'variable': 0, 'fixed': 1, 'designable': 2}
             Approach:
@@ -126,20 +126,16 @@ class ScfvTemplateConstructor:
             # For each region in the chain
             for region, region_index_dict in chain_dict['region_loc_dict'].items():
         
-                # Get zero-based indices for the region
-                start = region_index_dict['start']
-                end = region_index_dict['end'] 
-        
-                # Create list of zero-based indices and adjust by residue offset to make them 1-based and account for previous chain and linker
-                zero_indices_list = list(range(start, end + 1)) # +1 to include end index
-                adjusted_indices_list = [i + residue_offset for i in zero_indices_list]
-
+                # Get adjusted start and end indices for the region. Adjustment accounts for linker and position of heavy/light in scfv
+                start_adj = region_index_dict['start'] + residue_offset
+                end_adj = region_index_dict['end'] + residue_offset 
+    
                 # Assign to appropriate category in indices_dict
                 if "fmwk" in region:
                     # Check whether Cysteine is in fmwk region -> must mutate  out -> index should be part of designable residues
                     seq_fmwk = chain_dict['region_seqs_dict'][region]
                     # 1. Find all indices where 'C' appears
-                    cys_indices_list = [adjusted_indices_list[i] for i, char in enumerate(seq_fmwk) if char == "C"]
+                    cys_indices_list = [i + start_adj for i, char in enumerate(seq_fmwk) if char == "C"]
                     cys_indices_full.extend(cys_indices_list)
                     # 2. If any are found, move them to designable and remove from original list
                     if cys_indices_list:
@@ -148,17 +144,26 @@ class ScfvTemplateConstructor:
                             scfv_mapping[cys_index] = self.residue_mapping_dict['designable']
                     
                 elif "cdr" in region:
+                    
                     # Extend CDR definition by cdr_extend on both sides (Accounts for discrepancies between antibody annotation schemes on CDR definitions)
-                    extended_start = max(start - cdr_extend + residue_offset, 0) # Ensure start does not go below 0
-                    extended_end = min(end + cdr_extend + residue_offset + 1, scfv_length) # Ensure end does not exceed scfv length. + 1 to include end index, since end is exclusive 
-                    # Key Change: Define paratope based on the extended start and end indices. Restrict CDR definition to original Martin definition
-                    # Advantage: Allow model to design/operate on Vernier Zone residues
-                    # Risk: Model could mutate potential Vernier Zone residues to potentially intolerable residues
-                    paratope_residues_zero_indexed[extended_start: extended_end] = 1
-                    if risk: # Allowing model to mutate potential Vernier Zone residues                 
-                        scfv_mapping[start: end + 1] = self.residue_mapping_dict['fixed'] # +1 to include end index
-                    else: # Do not allow model to mutate potential Vernier Zone residues
-                        scfv_mapping[extended_start: extended_end] = self.residue_mapping_dict['fixed']
+                    safe_start = max(start_adj - cdr_extend, 0) # Ensure start does not go below 0
+                    safe_end = min(end_adj + cdr_extend + 1, scfv_length) # Ensure end doesn't exceed scfv length. + 1 to include end index 
+                    
+                    # Define paratope based on the extended start and end indices 
+                    paratope_residues_zero_indexed[safe_start: safe_end] = 1
+                    
+                    # Design Philosophy:
+                    # 1. Define paratope based on the extended start and end indices. Restrict CDR definition to original Martin definition
+                    # 2. If safe, fix entire paratope (CDR + potential Vernier Zone residues on sides of CDR defined by cdr extend length)
+                    # 3. If not safe, fix only CDR region and allow (residues on either side of CDR or potential Vernier Zone Residues) to be designable
+                    if safe: # Fixing Entire Paratope (CDR + potential Vernier Zone residues on sides of CDR defined by cdr extend length)                 
+                        scfv_mapping[safe_start: safe_end] = self.residue_mapping_dict['fixed']
+                    else: # Fixing only CDR region and allowing residues on either side of CDR to be designable
+                        # Use Safe CDR definition which is the extended start and extended end indices, but negate the extension
+                        unsafe_start = safe_start + cdr_extend
+                        unsafe_end = safe_end - cdr_extend
+                        scfv_mapping[unsafe_start: unsafe_end] = self.residue_mapping_dict['fixed'] 
+                        
 
         # Convert Paratope Residues Indices to a 1-indexed string format for Protein Hunter input (separated by commas)
         paratope_indices_one_indexed = [index + 1 for index, val in enumerate(paratope_residues_zero_indexed) if val == 1]
@@ -318,7 +323,7 @@ class ScfvTemplateConstructor:
                 output_json_path (str): Path to the saved JSON file
         """
         # 1. Setup your staples (High positive bias = forced selection)
-        staple_residues = ["V", "I", "L", "A", "M"]
+        staple_residues = ["V", "I", "L", "A", "F"]
         staple_bias = 100.0  # Strong Positive bias imposes MPNN to select between residues
 
         # 2. Create the dictionary
@@ -341,7 +346,7 @@ class ScfvTemplateConstructor:
         return output_json_path
     
     def create_protein_hunter_inputs(self, output_file_path, linker_length=20, cdr_extend: int = 2, 
-                                     probs_dict: dict = {'fixed': 0.0, 'variable': 0.7, 'designable': 1.01}):
+                                     probs_dict: dict = {'fixed': 0.0, 'variable': 0.7, 'designable': 1.01}, safe = True):
         """ Creates the single chain PDB file and extract seq input for Protein Hunter inputs """
         
         # 1. Extract chain sequences
@@ -350,7 +355,8 @@ class ScfvTemplateConstructor:
         annotated_paired_seq = self.annotate_paired_sequence(paired_seq)
         # 3. Create mapping of fixed/designable/variable indices
         fixed_designable_variable_indices, paratope_indices, cys_indices = self.create_fixed_designable_variable_array(annotated_paired_seq,
-                                                                                                                         linker_length=linker_length, cdr_extend=cdr_extend)
+                                                                                                                       linker_length=linker_length, cdr_extend=cdr_extend,
+                                                                                                                       safe=safe)
         # 4. Create Final Fixed and Designable Dict 
         final_fixed_designable_dict, sc_res_designable_dict = self.create_final_fixed_designable_dict(fixed_designable_variable_indices, probs_dict=probs_dict)
         # Create single chain PDB file with linker
