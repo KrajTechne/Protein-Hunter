@@ -1,4 +1,3 @@
-from itertools import chain
 import os
 import numpy as np
 import biotite
@@ -10,20 +9,21 @@ import biotite.structure.io.pdb as pdb
 import biotite.structure.io.pdbx as pdbx
 import py2Dmol
 # Class Imports
-print(os.getcwd())
-from boltz_ph.scfv_utils.Scfv import Scfv
+from AnalyzeFAB import AnalyzeFAB
+from mpnn_scorer import MPNNScorer
 
 class ScfvTemplateConstructor:
-    def __init__(self, fv_pdb_path: str, scheme: str = 'martin', target_name: str = 'target', orientation: str = 'VH-VL'):
-        self.fv_pdb_path = fv_pdb_path
+    def __init__(self, struc_fab_path: str, struc_fab_target_path: str, scheme: str = 'martin'):
+        self.struc_fab_path = struc_fab_path
+        self.struc_fab_target_path = struc_fab_target_path
         self.atom_lines = self._read_pdb_file()
-        self.scfv_annotator = Scfv(scheme = scheme)
-        self.target_name = target_name
-        self.orientation = orientation
+        self.fab_analysis = AnalyzeFAB(scheme = scheme)
+        self.fixed_residues = self.fab_analysis.analyze_fab(struc_fab_path, struc_fab_target_path)
+        self.fab_dict = self.fab_analysis.fab_dict
     
     def _read_pdb_file(self):
         """ Reads the PDB file and returns the atom lines """
-        with open(self.fv_pdb_path, 'r') as f:
+        with open(self.struc_fab_path, 'r') as f:
             lines = f.readlines()
         
         atom_lines = [line for line in lines if line.startswith("ATOM") or line.startswith("HETATM")]
@@ -36,42 +36,39 @@ class ScfvTemplateConstructor:
         viewer.add_pdb(pdb_file_path)
         return viewer.show()
     
-    def extract_chain_sequences(self):
-        """ Extract sequences for chains A and B from the PDB file """
-        seq_obj = seq.ProteinSequence()
+    def annotate_fab(self):
+        """ Annotates fab using the AnalyzeFAB Class """
         
-        # Account for possibility that input path may not be PDB. Could be PDB or mmCIF
-        if self.fv_pdb_path.endswith('.pdb'):
-            struc_file = pdb.PDBFile.read(self.fv_pdb_path)
-            struc_atom_array = pdb.get_structure(struc_file, model = 1) # Get first model (Assumption: only one model present)
-        elif self.fv_pdb_path.endswith('.cif'):
-            struc_file = pdbx.CIFFile.read(self.fv_pdb_path)
-            struc_atom_array = pdbx.get_structure(struc_file, model = 1) # Get first model (Assumption: only one model present)
+        annotated_paired_seq = self.fab_dict['annotated_fab']
+        seq_dict = {'heavy': annotated_paired_seq['heavy']['seq'], 'light': annotated_paired_seq['light']['seq']}
+
+        return seq_dict, annotated_paired_seq
     
-        # Extract sequences for each chain from structure atom array
-        chain_ids = np.unique(struc_atom_array.chain_id)
-        seq_dict = {}
-        paired_seq = ""
-        for chain_id in chain_ids:
-            chain_atoms = struc_atom_array[struc_atom_array.chain_id == chain_id]
-            aa_pos, aa3_list = struc.get_residues(chain_atoms)
-            chain_aa1_seq = ''.join([seq_obj.convert_letter_3to1(aa3) for aa3 in aa3_list])
-            seq_dict[chain_id] = chain_aa1_seq
-            paired_seq += chain_aa1_seq
+    def extract_fab_mpnn_scores(self, fab_seq: str, model_type:str = "soluble_mpnn"):
+        """ Extracts MPNN scores for each residue in the Fab sequence """
         
-        return seq_dict, paired_seq
-    
-    def annotate_paired_sequence(self, paired_seq):
-        """ Annotates the paired sequence using Scfv Annotator Class """
+        mpnn_scorer = MPNNScorer()
         
-        # Add {target_id: seq} to annotator
-        linker_dict = {self.target_name: ""}
-        orientation_dict = {self.target_name: self.orientation}
-        self.scfv_annotator.update_seqs(seq_id = self.target_name, seq = paired_seq)
-        annotated_paired_seq  = self.scfv_annotator.annotate_seqs(linker_dict, orientation_dict, target_dict={}, generate_motif_commands= False)
-        return annotated_paired_seq
+        def mpnn_score(model_type:str = "soluble_mpnn"):
+            path_output_folder = "/Volumes/sandbox/denovotrial/mpnn_scoring/cd3_fab_target/"
+            results = mpnn_scorer.score(pdb_path=self.struc_fab_target_path,
+                                out_folder= path_output_folder,
+                                model_type= model_type,
+                                chains_to_score=["A", "B"],
+                                single_aa_score = True,
+                                use_sequence = True,
+                                fixed_residues= None,  
+                                use_atom_context=False, 
+                                verbose=False,
+                                batch_size = 1,
+                                number_of_batches = 10)
+            return results
+        
+        scores = mpnn_score(model_type= model_type)
+        scores_fab = mpnn_scorer.extract_probs_fab(fab_seq = fab_seq, scores = scores)
+        return scores_fab
     
-    def create_fixed_designable_variable_array(self, annotated_paired_seq: dict, linker_length: int =20, cdr_extend: int = 2, safe = True):
+    def create_fixed_designable_variable_array(self, annotated_paired_seq: dict, linker_length: int = 20, cdr_extend: int = 2):
         """ Create a list of the linker length with fixed, variable, designable residues
             class_mapping = {'variable': 0, 'fixed': 1, 'designable': 2}
             Approach:
@@ -90,32 +87,21 @@ class ScfvTemplateConstructor:
                 cys_indices_one_indexed (list): List of 1-indexed residue positions of cysteine residues in antibody framework regions 
         """
 
-        if self.orientation == "VH-VL":
+        if annotated_paired_seq['orientation'] == "VH-VL":
             first_chain = "heavy"
             sec_chain = "light"
         else:
             first_chain = "light"
             sec_chain = "heavy"
         
-        target_annotation = annotated_paired_seq[self.target_name]
-        target_annotation_chains = {'heavy': target_annotation['heavy'], 'light': target_annotation['light']}
-        first_chain_length = len(target_annotation[first_chain]['seq'])
-        sec_chain_length = len(target_annotation[sec_chain]['seq'])
-        print(f"Heavy Chain Regions: {target_annotation['heavy']['region_seqs_dict']}")
-        print(f"Light Chain Regions: {target_annotation['light']['region_seqs_dict']}")
-
-        # ScFv Mapping list
+        annotated_chains = {'heavy': annotated_paired_seq['heavy'], 'light': annotated_paired_seq['light']}
+        first_chain_length = len(annotated_chains[first_chain]['seq'])
+        sec_chain_length = len(annotated_chains[sec_chain]['seq'])
         scfv_length = first_chain_length + sec_chain_length + linker_length
-        self.residue_mapping_dict = {'variable': 0, 'fixed': 1, 'designable': 2} # Mapping of residue types to integers for use in template construction
-         # Save as class variable to use in next step
-        scfv_mapping = np.zeros(scfv_length, dtype=int)
-        paratope_residues_zero_indexed = np.zeros(scfv_length, dtype=int)
-        
-        # For Linker region
-        scfv_mapping[first_chain_length : first_chain_length + linker_length] = self.residue_mapping_dict['designable']
         
         cys_indices_full = []
-        for chain, chain_dict in target_annotation_chains.items():
+        paratope_residues_zero_indexed = np.zeros(scfv_length, dtype=int)
+        for chain, chain_dict in annotated_chains.items():
     
             # Determine residue offset based on chain order
             if chain == first_chain:
@@ -137,11 +123,6 @@ class ScfvTemplateConstructor:
                     # 1. Find all indices where 'C' appears
                     cys_indices_list = [i + start_adj for i, char in enumerate(seq_fmwk) if char == "C"]
                     cys_indices_full.extend(cys_indices_list)
-                    # 2. If any are found, move them to designable and remove from original list
-                    if cys_indices_list:
-                        # 2.2 Assign them as class: designable 
-                        for cys_index in cys_indices_list:
-                            scfv_mapping[cys_index] = self.residue_mapping_dict['designable']
                     
                 elif "cdr" in region:
                     
@@ -151,18 +132,6 @@ class ScfvTemplateConstructor:
                     
                     # Define paratope based on the extended start and end indices 
                     paratope_residues_zero_indexed[safe_start: safe_end] = 1
-                    
-                    # Design Philosophy:
-                    # 1. Define paratope based on the extended start and end indices. Restrict CDR definition to original Martin definition
-                    # 2. If safe, fix entire paratope (CDR + potential Vernier Zone residues on sides of CDR defined by cdr extend length)
-                    # 3. If not safe, fix only CDR region and allow (residues on either side of CDR or potential Vernier Zone Residues) to be designable
-                    if safe: # Fixing Entire Paratope (CDR + potential Vernier Zone residues on sides of CDR defined by cdr extend length)                 
-                        scfv_mapping[safe_start: safe_end] = self.residue_mapping_dict['fixed']
-                    else: # Fixing only CDR region and allowing residues on either side of CDR to be designable
-                        # Use Safe CDR definition which is the extended start and extended end indices, but negate the extension
-                        unsafe_start = safe_start + cdr_extend
-                        unsafe_end = safe_end - cdr_extend
-                        scfv_mapping[unsafe_start: unsafe_end] = self.residue_mapping_dict['fixed'] 
                         
 
         # Convert Paratope Residues Indices to a 1-indexed string format for Protein Hunter input (separated by commas)
@@ -173,40 +142,70 @@ class ScfvTemplateConstructor:
         # Convert Cys indices to 1-indexed list
         cys_indices_one_indexed = [val + 1 for val in cys_indices_full]
 
-        return scfv_mapping, paratope_indices_str, cys_indices_one_indexed
+        return paratope_indices_str, cys_indices_one_indexed
     
-    def create_final_fixed_designable_dict(self, scfv_mapping: np.ndarray, probs_dict: dict):
-        """ Creates final fixed and designable dict for Protein Hunter input based on fixed, designable, and variable indices """
-        
-        # Establish sequence length
-        seq_len = len(scfv_mapping)
-
-        # Create initial dict to store residue categories: fixed and designable 
+    def create_final_fixed_designable_dict(self, cys_indices_one_pos: list,  linker_length: int, mpnn_probs: list, prob_fixed_threshold: float = 0.25):
+        """ Creates final fixed and designable dict for Protein Hunter input based on mpnn_probs & upper-core mask """
+    
+        # Extract information from the fab_analysis object
+        residue_mask_dictionary = self.fab_dict['residue_masks']
+        annotated_fab = self.fab_dict['annotated_fab']
+        mask_upper_core = residue_mask_dictionary['upper_core']
+        orientation = annotated_fab['orientation']
+        seq_len_heavy = len(annotated_fab['heavy']['seq'])
+        seq_len_light = len(annotated_fab['light']['seq'])
+    
+        # Define dictionaries to store fixed and designable residues indices
         final_fixed_designable_dict = {'fixed': [], 'designable': []}
         res_designable_dict = {}
-        for index in range(seq_len):
-            # Extract class_int at index position
-            category_int = scfv_mapping[index]
-            # Determine category of residue based on category int
-            if category_int == self.residue_mapping_dict['fixed']:
-                category = 'fixed'
-            elif category_int == self.residue_mapping_dict['designable']:
-                category = 'designable'
-            else:
-                category = 'variable'
-            
-            # Convert index position to residue position (1-indexed)
+
+        # Add Linker residues as designable residues
+        # Linker exists between heavy and light chains but need to know order
+        if orientation == "VH-VL":
+            linker_start = seq_len_heavy
+        elif orientation == "VL-VH":
+            linker_start = seq_len_light
+        else:
+            raise ValueError("Invalid orientation. Must be either 'VH-VL' or 'VL-VH.")
+
+        # 1. Create the MPNN with Linker and Mask with Linker arrays
+        mask_linker = np.zeros(linker_length)
+        mask_upper_core_linker = np.concatenate((
+            mask_upper_core[:linker_start], 
+            mask_linker, 
+            mask_upper_core[linker_start:]
+        ))
+        mpnn_probs_linker = np.concatenate((
+            mpnn_probs[:linker_start], 
+            mask_linker, 
+            mpnn_probs[linker_start:]
+        ))
+
+        # 2. Loop through each residue in the fab and check if it is in the upper core
+        # If in upper core, it is a fixed residue
+        # If not in upper core and mpnn_prob > prob_fixed_threshold, it is fixed
+        # If not in upper core and mpnn_prob < prob_fixed_threshold, it is designable
+        for index, val in enumerate(mask_upper_core_linker):
             res_1pos = index + 1
+            # If residue is in upper core, keep fixed
+            if val:
+                design_cat = 'fixed'
+            # If residue is not in upper core, check if mpnn_probs_linker is above threshold
+            else:
+                # if mpnn prob of current amino acid is above threshold, keep fixed
+                if mpnn_probs_linker[index] > prob_fixed_threshold:
+                    design_cat = 'fixed'
+                else:
+                    design_cat = 'designable'
             
-            # Assign residue to final dict based on category and associated probability
-            prob = probs_dict[category]
-            random_prob = np.random.rand() # Random number between 0 and 1. Outputting probs of fixed/designable based on this value
-            if random_prob >= prob:
-                final_fixed_designable_dict['fixed'].append(res_1pos)
-                res_designable_dict[res_1pos] = 'fixed'
-            else: # Assign to designable random prob 
-                final_fixed_designable_dict['designable'].append(res_1pos)
-                res_designable_dict[res_1pos] = 'designable'
+            # If residue is a cysteine in framework region, define class as 'designable'
+            if res_1pos in cys_indices_one_pos:
+                design_cat = 'designable'
+
+            # Add residue to final_fixed_designable_dict
+            res_designable_dict[res_1pos] = design_cat
+            final_fixed_designable_dict[design_cat].append(res_1pos)
+
         return final_fixed_designable_dict, res_designable_dict
     
     def create_sc_pdb_file(self, output_file_path, res_designable_dict, linker_length=20):
@@ -254,21 +253,20 @@ class ScfvTemplateConstructor:
         seq_input = ""
         for residue_number, lines in residue_to_lines.items():
             designability_attribute = res_designable_dict[residue_number]
+            
+            # Preserve residue lines as is, but adjust chain to 'A' and residue numbering (regardless of fixed or not)
+            for line in lines:
+                new_line = line[:pdb_chain_index] + 'A' + line[pdb_chain_index+1:pdb_residue_index.start] + str(residue_number).rjust(4) + line[pdb_residue_index.stop:]
+                pdb_lines.append(new_line)
+            
             if designability_attribute == 'fixed':
-                # Preserve residue lines as is, but adjust chain to 'A' and residue numbering (if chosen to be fixed and thus, included in template PDB)
-                for line in lines:
-                    new_line = line[:pdb_chain_index] + 'A' + line[pdb_chain_index+1:pdb_residue_index.start] + str(residue_number).rjust(4) + line[pdb_residue_index.stop:]
-                    pdb_lines.append(new_line)
-                
                 # Extract amino acid for seq input
                 line = lines[0] # Take first line of residue to extract amino acid
                 aa3 = line[17:20].strip() # Extract 3-letter amino acid code
                 aa1 = seq.ProteinSequence().convert_letter_3to1(aa3)
                 seq_input += aa1
             else: # designable, skip residue lines and add 'X' to seq input as model will redesign them
-                # Skip adding lines to pdb_lines
                 seq_input += "X"
-                continue # Skip designable residues as model will redesign them
 
         # Write to output PDB file       
         with open(output_file_path, 'w') as file:
@@ -345,27 +343,30 @@ class ScfvTemplateConstructor:
         print(f"Bias file created at {output_json_path} for indices: {list(bias_dict.keys())}")
         return output_json_path
     
-    def create_protein_hunter_inputs(self, output_file_path, linker_length=20, cdr_extend: int = 2, 
-                                     probs_dict: dict = {'fixed': 0.0, 'variable': 0.7, 'designable': 1.01}, safe = True):
+    def create_protein_hunter_inputs(self, output_file_path, linker_length=20):
         """ Creates the single chain PDB file and extract seq input for Protein Hunter inputs """
         
-        # 1. Extract chain sequences
-        seq_dict, paired_seq = self.extract_chain_sequences()
-        # 2. Annotate paired sequence
-        annotated_paired_seq = self.annotate_paired_sequence(paired_seq)
+        # 1. Annotate fab
+        seq_dict, annotated_paired_seq = self.annotate_fab()
+        paired_seq = annotated_paired_seq['seq']
+        
+        # 2. Extract fab mpnn scores
+        mpnn_scores_fab = self.extract_fab_mpnn_scores(fab_seq= paired_seq, model_type= "soluble_mpnn")
         # 3. Create mapping of fixed/designable/variable indices
-        fixed_designable_variable_indices, paratope_indices, cys_indices = self.create_fixed_designable_variable_array(annotated_paired_seq,
-                                                                                                                       linker_length=linker_length, cdr_extend=cdr_extend,
-                                                                                                                       safe=safe)
+        paratope_indices, cys_indices = self.create_fixed_designable_variable_array(annotated_paired_seq,
+                                                                                    linker_length=linker_length, 
+                                                                                    cdr_extend=2)
         # 4. Create Final Fixed and Designable Dict 
-        final_fixed_designable_dict, sc_res_designable_dict = self.create_final_fixed_designable_dict(fixed_designable_variable_indices, probs_dict=probs_dict)
-        # Create single chain PDB file with linker
+        final_fixed_designable_dict, sc_res_designable_dict = self.create_final_fixed_designable_dict(cys_indices_one_pos= cys_indices,
+                                                                                                      linker_length= linker_length,
+                                                                                                      mpnn_probs= mpnn_scores_fab)
+        # 5. Create single chain PDB file with linker
         seq_input = self.create_sc_pdb_file(output_file_path=output_file_path, res_designable_dict= sc_res_designable_dict, linker_length=linker_length)
         
-        # 5. Convert to mmCIF format
+        # 6. Convert to mmCIF format
         output_cif_path = self.convert_pdb_to_cif(input_pdb_path=output_file_path)
 
-        # 6. Create JSON file for per-residue bias. Need to mutate cysteine residues to common hydrophobic residues
+        # 7. Create JSON file for per-residue bias. Need to mutate cysteine residues to common hydrophobic residues
         json_path = self.create_mpnn_per_residue_bias(cys_residue_numbers=cys_indices)
 
         print("Number of Fixed Residues:", len(final_fixed_designable_dict['fixed']))
