@@ -1,7 +1,27 @@
+import sys
+import types
+# --- ProDy Workaround for Databricks ---
+# ProDy tries to import 'ttk', 'filedialog', and 'messagebox' from tkinter.
+# Need to mock tkinter AND these specific attributes to satisfy the import.
+
+# 1. Create the main mock module
+mock_tk = types.ModuleType("tkinter")
+
+# 2. Create mocks for the submodules ProDy specifically asks for
+mock_tk.ttk = types.ModuleType("ttk")
+mock_tk.filedialog = types.ModuleType("filedialog")
+mock_tk.messagebox = types.ModuleType("messagebox")
+
+# 3. Addding them as empty attributes to satisfy import
+# (The import system looks for these attributes on the module object)
+sys.modules["tkinter"] = mock_tk
+sys.modules["tkinter.ttk"] = mock_tk.ttk
+sys.modules["tkinter.filedialog"] = mock_tk.filedialog
+sys.modules["tkinter.messagebox"] = mock_tk.messagebox
+
 import gc
 import os
 import random
-import sys
 import warnings
 from dataclasses import asdict
 from pathlib import Path
@@ -14,7 +34,6 @@ import pandas as pd
 import py3Dmol
 import torch
 from prody import parsePDB
-
 
 from boltz_ph.constants import CHAIN_TO_NUMBER
 from utils.metrics import get_CA_and_sequence
