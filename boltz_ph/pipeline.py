@@ -570,13 +570,11 @@ class ProteinHunter_Boltz:
                 new_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100)
                 _ = update_binder_sequence(new_seq)
             else:
-                probs_dict = {'fixed': 0.0, 'variable': float(a.variable_prob), 'designable': 1.01} # Setting variable to 0.999 enforces only CDRs as fixed residues
-                scfv_constructor = ScfvTemplateConstructor(fv_pdb_path= a.input_pdb_path)
+
+                scfv_constructor = ScfvTemplateConstructor(struc_fab_path= a.input_pdb_path, struc_fab_target_path = a.struc_fab_target_path)
                 output_file_path = a.input_pdb_path.replace(".pdb", "_sc_ph_template.pdb")
                 _, _, seq_input, output_cif_path, index_dict, _, bias_aa_json = scfv_constructor.create_protein_hunter_inputs(output_file_path=output_file_path, 
-                                                                                                                         linker_length=a.linker_length,
-                                                                                                                         probs_dict=probs_dict,
-                                                                                                                         safe = bool(a.safe))
+                                                                                                                         linker_length=a.linker_length)
                 # On the retry, need to update inputted seq, template cif file, and new set of fixed residues
                 new_seq = seq_input
                 updated_fixed_residues = index_dict['fixed']

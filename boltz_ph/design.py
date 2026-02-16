@@ -132,14 +132,12 @@ def parse_args():
     # Params for Partial Redesign: 
     # Reinitializing the sequence and template construction if do not meet desired contact threshold at cycle 0
     # (e.g., if fewer than 2 of the specified contact residues are contacted by the designed binder)
-    parser.add_argument("--variable_prob", default = 0.7, type=float, 
-                        help = "Probability of keeping residue mutable in partial redesign mode. 0.0 = fixed, 1.0 = designable.")
     parser.add_argument("--input_pdb_path", default = "", type=str, 
                         help = "Path to input PDB file for partial redesign mode.")
+    parser.add_argument("--struc_fab_target_path", default = "", type=str, 
+                        help = "Path to a PDB/CIF file containing the fab-target complex for partial redesign mode.")
     parser.add_argument("--linker_length", default = 20, type=int, 
                         help = "Length of the linker to be used in constructing the single chain template for partial redesign.")
-    parser.add_argument("--safe", default = True, type = bool,
-                        help = "If True, will fix CDRs and surrounding residues defined by CDR extend length")
     
     # Params for specifying path to model weights
     parser.add_argument("--model_weights_path", default = "", type=str, 
