@@ -61,7 +61,7 @@ class LigandMPNNWrapper:
                 temp_json_path = os.path.join(tmpdir, "temperature_per_residue.json")
                 with open(temp_json_path, "w") as f:
                     json.dump(temperature_per_residue, f)
-
+            
             # --- Build base command ---
             cmd = [
                 self.python, self.run_py,
@@ -86,6 +86,10 @@ class LigandMPNNWrapper:
                 cmd += ["--checkpoint_ligand_mpnn", os.path.join(MODEL_DIR, "ligandmpnn_v_32_010_25.pt")]
             elif model_type == "soluble_mpnn":
                 cmd += ["--checkpoint_soluble_mpnn", os.path.join(MODEL_DIR, "solublempnn_v_48_020.pt")]
+            elif model_type == "hyper_mpnn":
+                cmd += ["--checkpoint_hyper_mpnn", os.path.join(MODEL_DIR, "v48_020_epoch300_hyper.pt")]
+            else:
+                raise ValueError(f"Unknown model type: {model_type}")
 
             # --- Add AA control options ---
             if omit_AA:

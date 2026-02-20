@@ -61,6 +61,8 @@ def main(args) -> None:
         checkpoint_path = args.checkpoint_global_label_membrane_mpnn
     elif args.model_type == "soluble_mpnn":
         checkpoint_path = args.checkpoint_soluble_mpnn
+    elif args.model_type == "hyper_mpnn":
+        checkpoint_path = args.checkpoint_hyper_mpnn
     else:
         print("Choose one of the available models")
         sys.exit()
@@ -744,6 +746,13 @@ if __name__ == "__main__":
         type=str,
         default="./model_params/solublempnn_v_48_020.pt",
         help="Path to model weights.",
+    )
+
+    argparser.add_argument(
+        "--checkpoint_hyper_mpnn",
+        type = str,
+        default="./model_params/v48_020_epoch300_hyper.pt",
+        help="Path to model weights."
     )
 
     argparser.add_argument(
