@@ -61,6 +61,7 @@ def parse_args():
     )
     parser.add_argument("--ccd_path", default="~/.boltz/mols", type=str)
     parser.add_argument("--randomly_kill_helix_feature", action="store_true", default=False)
+    parser.add_argument("--linker_struc_bias", action = "store_true", default = False)
     parser.add_argument("--negative_helix_constant", default=0.2, type=float)
     parser.add_argument("--logmd", action="store_true", default=False)
     parser.add_argument("--save_dir", default="", type=str)
