@@ -34,6 +34,7 @@ import pandas as pd
 import py3Dmol
 import torch
 from prody import parsePDB
+from StrucTools import extract_atom_array, determine_binding_interface
 
 from boltz_ph.constants import CHAIN_TO_NUMBER
 from utils.metrics import get_CA_and_sequence
@@ -124,65 +125,39 @@ def get_CA(x):
                     xyz.append([x_coord, y_coord, z_coord])
     return np.array(xyz)
 
-
-def binder_binds_contacts(pdb_path, binder_chain, target_chain, contact_residues, paratope_residues: str = "", cutoff=10.0):
+def binder_binds_contacts(pdb_path, binder_chain, target_chain, contact_residues, paratope_residues: str = "", cutoff= 4.5):
     """
     Returns True if at least 2 contact residues on target_chain
     are contacted by any CA atom of binder_chain within cutoff angstroms.
     """
+    
+    # Convert both contact and paratope residues from strings to respective lists of integers (only applicable if provided)
     if isinstance(contact_residues, str):
         if contact_residues.strip() == "":
             return True
         contact_residues = [int(x) for x in contact_residues.split(",") if x.strip()]
-
-    structure = parsePDB(pdb_path)
-    if structure is None:
-        return False
-
-    def get_chain_ca_atoms_and_resnums(chain_id):
-        ca_atoms = []
-        ca_resnums = []
-        for atom in structure.iterAtoms():
-            # Check chain ID and atom name
-            if atom.getChid() == chain_id and atom.getName() == "CA":
-                ca_atoms.append(atom)
-                ca_resnums.append(atom.getResnum())
-        return ca_atoms, ca_resnums
-
-    binder_ca_atoms, binder_resnums = get_chain_ca_atoms_and_resnums(binder_chain)
-    target_ca_atoms, target_resnums = get_chain_ca_atoms_and_resnums(target_chain)
-
-    if len(binder_ca_atoms) == 0 or len(target_ca_atoms) == 0:
-        return False
-
-    binder_coords = np.array([atom.getCoords() for atom in binder_ca_atoms])
-    target_coords = np.array([atom.getCoords() for atom in target_ca_atoms])
-
-    # Filter binder coordinates to only paratope residues if specified
+    
     if paratope_residues != "":
         paratope_residues = [int(x) for x in paratope_residues.split(",") if x.strip()]
-        paratope_indices = [i for i, resnum in enumerate(binder_resnums) if resnum in paratope_residues]
-        binder_coords = binder_coords[paratope_indices]
     
-    # Get indices of contact residues on target chain
-    contact_indices = [
-        i for i, resnum in enumerate(target_resnums) if resnum in contact_residues
-    ]
-    if not contact_indices:
-        return False
-
-    filtered_target_coords = target_coords[contact_indices]
+    contact_information = determine_binding_interface(pdb_file_path = pdb_path, desired_epitope_residues = contact_residues, binder_chain_id = binder_chain,
+                                                      target_chain_id = target_chain, cutoff = cutoff)
     
-    # For each contact residue, check if any binder CA is within cutoff.
-    contacted = 0
-    for c_coord in filtered_target_coords:
-        distances = np.sqrt(np.sum((binder_coords - c_coord) ** 2, axis=-1))
-        if np.any(distances < cutoff):
-            contacted += 1
+    # Extract detected paratope and epitope indices from contact_information dictionary
+    actual_paratope_residues_str = contact_information['paratope_indices']
+    actual_paratope_residues = [int(x) for x in actual_paratope_residues_str.split(",")]
+    
+    actual_contact_residues_str = contact_information['epitope_indices']
+    actual_contact_residues = [int(x) for x in actual_contact_residues_str.split(",")]
+    
+    # Contact Check passes if >2 desired epitope residues are in detected epitope residues and likewise for paratope residues
+    contacted = False
+    num_common_paratope_residues = len(set(paratope_residues).intersection(actual_paratope_residues))
+    num_common_epitope_residues = len(set(contact_residues).intersection(actual_contact_residues))
+    if num_common_paratope_residues >= 2 and num_common_epitope_residues >= 2:
+        contacted = True
 
-    # Require at least 2 contacted residues to pass the filter
-    return contacted >= 2
-
+    return contacted
 
 def sample_seq(length: int, exclude_P: bool = True, frac_X: float = 0.0) -> str:
     """Samples a random sequence of the given length, optionally excluding Proline (P) and including 'X' residues."""
@@ -528,6 +503,7 @@ def run_prediction(
     device="cpu",
     boltz_model_version="boltz2",
     pocket_conditioning=False,
+    linker_struc_bias = False,
 ):
     """Parses data, generates batch, and runs a single Boltz prediction step."""
     # 1. Update sequence if provided
@@ -580,6 +556,7 @@ def run_prediction(
         binder_chain=binder_chain,
         logmd=logmd,
         structure=structure,
+        linker_struc_bias = linker_struc_bias,
     )
     return output, structure
 
@@ -605,13 +582,18 @@ def design_sequence(
     return_logits=False,
     fixed_residues = "",
     model_weights_path = "",
-    bias_AA_per_residue = ""
+    bias_AA_per_residue = "",
+    seed = 111
 ):
+
     """Runs the LigandMPNN (or SolubleMPNN) sequence design wrapper."""
+    if seed is None:
+        seed = int(np.random.randint(0, high=99999, size=1, dtype=int)[0])
+    
     seq, logits = designer.run(
         model_type=model_type,
         pdb_path=pdb_file,
-        seed=111, # Fixed seed for reproducibility per design tool
+        seed=seed, # Fixed seed for reproducibility per design tool
         chains_to_design=chains_to_design,
         bias_AA=bias_AA,
         omit_AA=omit_AA,
