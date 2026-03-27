@@ -9,15 +9,29 @@ import numpy as np
 import pandas as pd
 import torch
 import yaml
+import warnings
 
+warnings.filterwarnings("ignore")
+print(os.getcwd())
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+toolkit_path = os.path.abspath("../Scfv_Toolkit")
+run_mpnn_path = os.path.abspath("../RunMPNN")
+scoring_physics_path = os.path.abspath("../ScoringPhysics")
+sys.path.append(toolkit_path)
+sys.path.append(run_mpnn_path)
+sys.path.append(scoring_physics_path)
+
 from LigandMPNN.wrapper import LigandMPNNWrapper
 
 from boltz_ph.constants import CHAIN_TO_NUMBER
 from utils.metrics import get_CA_and_sequence # Used implicitly in design.py
 from utils.convert import calculate_holo_apo_rmsd, convert_cif_files_to_pdb
 
-from boltz_ph.scfv_utils.ScfvTemplateConstructor import ScfvTemplateConstructor 
+from mpnn_scorer import MPNNScorer
+from AnalyzeFAB import AnalyzeFAB
+from StrucTools import *
+from boltz_ph.scfv_utils.ScfvTemplateConstructor import ScfvTemplateConstructor
+
 
 
 from model_utils import (
@@ -433,7 +447,7 @@ class ProteinHunter_Boltz:
             "sampling_steps": self.args.diffuse_steps,
             "diffusion_samples": 1,
             "write_confidence_summary": True,
-            "write_full_pae": False,
+            "write_full_pae": True,
             "write_full_pde": False,
             "max_parallel_samples": 1,
         }
@@ -460,6 +474,8 @@ class ProteinHunter_Boltz:
 
         # Initialize run metrics and tracking variables
         best_iptm = float("-inf")
+        best_ipsae_max = float("-inf")
+        best_ipsae_min = float("-inf")
         best_seq = None
         best_structure = None
         best_output = None
@@ -480,21 +496,32 @@ class ProteinHunter_Boltz:
             protein_chain_ids = sorted({chain for chain, _ in data_cp["constraints"][0]["pocket"]["contacts"]})
 
         # Helper function to update sequence in the data dictionary
-        def update_binder_sequence(new_seq, template_path: str = None):
+        def update_binder_sequence(new_seq: str = "", template_path: str = ""):
             """ Updates the binder sequence in the data dictionary. Also, updates template path if provided. """
             # Update template path if provided
-            if template_path:
-                # Also update path to template if provided
-                for seq_entry in data_cp["templates"]:
-                    if seq_entry['chain_id'] == self.binder_chain:
-                        seq_entry['cif'] = os.path.abspath(template_path)
+            if template_path != "":
+                if template_path.endswith(".cif"):
+                    # Also update path to template if provided
+                    for seq_entry in data_cp["templates"]:
+                        if seq_entry['chain_id'] == self.binder_chain:
+                            seq_entry['cif'] = os.path.abspath(template_path)
+                # Remove path to template if "reset" is initiated
+                elif template_path == "reset":
+                    # Filter the list to KEEP everything except the binder template
+                    data_cp["templates"] = [t for t in data_cp["templates"] if t["chain_id"] != self.binder_chain]
+                    #for seq_entry in data_cp['templates']:
+                    #    if seq_entry['chain_id'] == self.binder_chain:
+                    #        seq_entry['cif'] = ""
+                else:
+                    raise ValueError("Invalid template path provided.")
             # Update sequence
-            for seq_entry in data_cp["sequences"]:
-                if ("protein" in seq_entry and self.binder_chain in seq_entry["protein"]["id"]):
-                    seq_entry["protein"]["sequence"] = new_seq
-                    return new_seq    
-             # Should not happen if data_cp is built correctly
-            raise ValueError("Binder chain not found in data dictionary.")
+            if new_seq != "":
+                for seq_entry in data_cp["sequences"]:
+                    if ("protein" in seq_entry and self.binder_chain in seq_entry["protein"]["id"]):
+                        seq_entry["protein"]["sequence"] = new_seq
+                        return new_seq    
+                # Should not happen if data_cp is built correctly
+                raise ValueError("Binder chain not found in data dictionary.")
         
         # Set initial binder sequence
         if a.seq =="":
@@ -527,6 +554,9 @@ class ProteinHunter_Boltz:
                 device=self.device,
                 boltz_model_version=a.boltz_model_version,
                 pocket_conditioning=pocket_conditioning,
+                linker_struc_bias = a.linker_struc_bias,
+                linker_start = a.linker_start,
+                linker_length = a.linker_length
             )
             pdb_filename = f"{run_save_dir}/{a.name}_run_{run_id}_predicted_cycle_0.pdb"
             plddts = output["plddt"].detach().cpu().numpy()[0]
@@ -567,20 +597,21 @@ class ProteinHunter_Boltz:
             # Resample initial sequence
             # If partial redesign, keep binder seq the same
             if a.mode != "partial_redesign":
-                new_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100)
-                _ = update_binder_sequence(new_seq)
+                updated_seq = sample_seq(binder_length, exclude_P=a.exclude_P, frac_X=a.percent_X/100)
+                _ = update_binder_sequence(updated_seq)
             else:
 
                 scfv_constructor = ScfvTemplateConstructor(struc_fab_path= a.input_pdb_path, struc_fab_target_path = a.struc_fab_target_path)
-                output_file_path = a.input_pdb_path.replace(".pdb", "_sc_ph_template.pdb")
-                _, _, seq_input, output_cif_path, index_dict, _, bias_aa_json = scfv_constructor.create_protein_hunter_inputs(output_file_path=output_file_path, 
-                                                                                                                         linker_length=a.linker_length)
-                # On the retry, need to update inputted seq, template cif file, and new set of fixed residues
-                new_seq = seq_input
+                # save_pdb_path = 'testing_scripts/sc_anti_cd3_fab_target.pdb'
+                save_pdb_path = a.template_path.replace(".cif", ".pdb")
+                _, seq_input, output_cif_path, index_dict, _, bias_aa_json = scfv_constructor.create_protein_hunter_inputs(save_pdb_path= save_pdb_path, linker_length=a.linker_length)
+                # On the retry, need to update inputted seq, template cif file, linker_start, and new set of fixed residues
+                updated_seq = seq_input
+                a.linker_start = updated_seq.find("X")
                 updated_fixed_residues = index_dict['fixed']
                 current_fixed_residues = ' '.join([f"A{res}" for res in updated_fixed_residues])
-                _ = update_binder_sequence(new_seq, template_path=output_cif_path)
-                print(f"Resampled binder sequence: {new_seq}")
+                _ = update_binder_sequence(updated_seq, template_path=output_cif_path)
+                print(f"Resampled binder sequence: {updated_seq}")
             clean_memory()
 
         clean_memory() # <-- ADD THIS CALL HERE
@@ -602,6 +633,10 @@ class ProteinHunter_Boltz:
             cycle_0_iptm = float(np.mean(values) if values else 0.0)
         else:
             cycle_0_iptm = 0.0
+        
+        # Calculate ipsae
+        pae_matrix = output['pae'][0]
+        cycle_0_ipsae_min, cycle_0_ipsae_max = calculate_ipsae_complex(pae_matrix = pae_matrix, len_binder = binder_length)
 
         run_metrics["cycle_0_iptm"] = cycle_0_iptm
         run_metrics["cycle_0_plddt"] = float(
@@ -611,10 +646,17 @@ class ProteinHunter_Boltz:
             output.get("complex_iplddt", torch.tensor([0.0])).detach().cpu().numpy()[0]
         )
         run_metrics["cycle_0_alanine"] = 0
+        run_metrics["cycle_0_ipsae_max"] = cycle_0_ipsae_max
+        run_metrics["cycle_0_ipsae_min"] = cycle_0_ipsae_min
 
         # --- Optimization Cycles ---
         for cycle in range(a.num_cycles):
             print(f"\n--- Run {run_id}, Cycle {cycle + 1} ---")
+
+            # Reset the template as want to use template to give idea of overall structure of antibody or scfv for partial redesign
+            # Continued reliance of template biases the soluble mpnn designs and artificially inflates model confidence metrics
+            if a.mode == "partial_redesign":
+                _ = update_binder_sequence(new_seq = "", template_path= "reset")
 
             # Calculate temperature and bias for the cycle
             cycle_norm = (cycle / (a.num_cycles - 1)) if a.num_cycles > 1 else 0.0
@@ -628,20 +670,67 @@ class ProteinHunter_Boltz:
                 if (a.ligand_smiles or a.ligand_ccd or a.nucleic_seq)
                 else "soluble_mpnn"
             )
+
+            #--------------------------------------------------------All below code to run first pass with protein/hyper mpnn
+            if a.fixed_residues_protein != "":
+                design_kwargs = {
+                    "pdb_file": pdb_filename,
+                    "temperature": a.temperature,
+                    "chains_to_design": self.binder_chain,
+                    "omit_AA": f"{a.omit_AA},P" if cycle == 0 else a.omit_AA,
+                    "bias_AA": f"A:{alpha}" if a.alanine_bias else "",
+                    "fixed_residues": a.fixed_residues_protein, # adjusted for protein, used to be current_residues (a.fixed_residues)
+                    "model_weights_path" : a.model_weights_path,
+                    "bias_AA_per_residue" : a.bias_AA_per_residue,
+                    "seed" : None
+                }
+
+                # 1st pass with protein mpnn
+                model_type = "protein_mpnn"
+                seq_str, logits = design_sequence(
+                    self.designer, model_type, **design_kwargs
+                )
+
+                # Extract sequence and update binder seq
+                seq = seq_str.split(":")[CHAIN_TO_NUMBER[self.binder_chain]] 
+                _ = update_binder_sequence(seq) # Use the helper function to update the sequence
+            
+                output, structure = run_prediction(
+                    data_cp,
+                    self.binder_chain,
+                    seq=seq,
+                    randomly_kill_helix_feature=False,
+                    negative_helix_constant=0.0,
+                    boltz_model=self.boltz_model,
+                    ccd_lib=self.ccd_lib,
+                    ccd_path=self.ccd_path,
+                    logmd=False,
+                    device=self.device,
+                )
+           
+                pdb_filename = f"{run_save_dir}/{a.name}_run_{run_id}_{model_type}_predicted_cycle_0.pdb"
+                plddts = output["plddt"].detach().cpu().numpy()[0]
+                save_pdb(structure, output["coords"], plddts, pdb_filename)
+
+            #------------------------------------------------ All above extra code to run one full pass with protein_mpnn------------------------
             design_kwargs = {
                 "pdb_file": pdb_filename,
                 "temperature": a.temperature,
                 "chains_to_design": self.binder_chain,
                 "omit_AA": f"{a.omit_AA},P" if cycle == 0 else a.omit_AA,
                 "bias_AA": f"A:{alpha}" if a.alanine_bias else "",
-                "fixed_residues": current_fixed_residues,
+                "fixed_residues": a.fixed_residues_soluble if a.fixed_residues_soluble != "" else a.fixed_residues, 
                 "model_weights_path" : a.model_weights_path,
-                "bias_AA_per_residue" : a.bias_AA_per_residue
+                "bias_AA_per_residue" : a.bias_AA_per_residue,
+                "seed" : None
             }
 
+            # 2nd pass with soluble mpnn
+            model_type = "soluble_mpnn"
             seq_str, logits = design_sequence(
                 self.designer, model_type, **design_kwargs
             )
+            
             # The output seq_str is a dictionary-like string, we extract the binder chain sequence
             seq = seq_str.split(":")[CHAIN_TO_NUMBER[self.binder_chain]] 
 
@@ -690,6 +779,10 @@ class ProteinHunter_Boltz:
                 current_iptm = float(np.mean(values) if values else 0.0)
             else:
                 current_iptm = 0.0
+            
+            # Calculate ipsae_min and ipsae_max
+            pae_matrix = output['pae'][0]
+            current_ipsae_min, current_ipsae_max = calculate_ipsae_complex(pae_matrix = pae_matrix, len_binder = binder_length)
 
             # Update best structure (only if alanine content is acceptable)
             if alanine_percentage <= 0.20 and current_iptm > best_iptm:
@@ -729,6 +822,14 @@ class ProteinHunter_Boltz:
             run_metrics[f"cycle_{cycle + 1}_iplddt"] = curr_iplddt
             run_metrics[f"cycle_{cycle + 1}_alanine"] = alanine_count
             run_metrics[f"cycle_{cycle + 1}_seq"] = seq
+            run_metrics[f"cycle_{cycle + 1}_ipsae_min"] = current_ipsae_min
+            run_metrics[f"cycle_{cycle + 1}_ipsae_max"] = current_ipsae_max
+
+            # Update best ipsae_min and ipsae_max
+            if current_ipsae_min > best_ipsae_min:
+                best_ipsae_min = current_ipsae_min
+            if current_ipsae_max > best_ipsae_max:
+                best_ipsae_max = current_ipsae_max
 
             pdb_filename = (
                 f"{run_save_dir}/{a.name}_run_{run_id}_predicted_cycle_{cycle + 1}.pdb"
@@ -738,7 +839,7 @@ class ProteinHunter_Boltz:
             clean_memory()
 
             print(
-                f"ipTM: {current_iptm:.2f} pLDDT: {curr_plddt:.2f} iPLDDT: {curr_iplddt:.2f} Alanine count: {alanine_count}"
+                f"ipTM: {current_iptm:.2f} ipsae_min: {current_ipsae_min:.2f} ipsae_max: {current_ipsae_max:.2f} pLDDT: {curr_plddt:.2f} iPLDDT: {curr_iplddt:.2f} Alanine count: {alanine_count}"
             )
 
             # 4. Save YAML for High ipTM
@@ -803,6 +904,8 @@ class ProteinHunter_Boltz:
                     "run_id": run_id,
                     "cycle": cycle + 1,
                     "iptm": current_iptm,
+                    "ipsae_min": current_ipsae_min,
+                    "ipsae_max" : current_ipsae_max,
                     "plddt": curr_plddt,
                     "iplddt": curr_iplddt,
                     "alanine_count": alanine_count,
@@ -836,11 +939,15 @@ class ProteinHunter_Boltz:
                 .numpy()[0]
             )
             run_metrics["best_seq"] = best_seq
+            run_metrics["best_ipsae_min"] = float(best_ipsae_min)
+            run_metrics["best_ipsae_max"] = float(best_ipsae_max)
         else:
             run_metrics["best_iptm"] = float("nan")
             run_metrics["best_cycle"] = None
             run_metrics["best_plddt"] = float("nan")
             run_metrics["best_seq"] = None
+            run_metrics["best_ipsae_min"] = float("nan")
+            run_metrics["best_ipsae_max"] = float("nan")
 
         if a.plot:
             plot_run_metrics(run_save_dir, a.name, run_id, a.num_cycles, run_metrics)
@@ -856,6 +963,8 @@ class ProteinHunter_Boltz:
             columns.extend(
                 [
                     f"cycle_{i}_iptm",
+                    f"cycle_{i}_ipsae_min",
+                    f"cycle_{i}_ipsae_max",
                     f"cycle_{i}_plddt",
                     f"cycle_{i}_iplddt",
                     f"cycle_{i}_alanine",
@@ -863,7 +972,7 @@ class ProteinHunter_Boltz:
                 ]
             )
         # Best metric columns
-        columns.extend(["best_iptm", "best_cycle", "best_plddt", "best_seq"])
+        columns.extend(["best_iptm", "best_ipsae_min", "best_ipsae_max", "best_cycle", "best_plddt", "best_seq"])
 
         summary_csv = os.path.join(self.save_dir, "summary_all_runs.csv")
         df = pd.DataFrame(all_run_metrics)

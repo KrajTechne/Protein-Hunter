@@ -504,6 +504,8 @@ def run_prediction(
     boltz_model_version="boltz2",
     pocket_conditioning=False,
     linker_struc_bias = False,
+    linker_start = 0,
+    linker_length = 0
 ):
     """Parses data, generates batch, and runs a single Boltz prediction step."""
     # 1. Update sequence if provided
@@ -557,6 +559,8 @@ def run_prediction(
         logmd=logmd,
         structure=structure,
         linker_struc_bias = linker_struc_bias,
+        linker_start = linker_start,
+        linker_length = linker_length
     )
     return output, structure
 

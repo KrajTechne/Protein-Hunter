@@ -93,6 +93,18 @@ def parse_args():
         help="Provide fixed residues, A12 A13 A14 B2 B25",
     )
     parser.add_argument(
+        "--fixed_residues_protein",
+        type = str, 
+        default= "",
+        help = "Provide fixed residues for Protein MPNN: A12 A13 A14 B2 B25"
+    )
+    parser.add_argument(
+        "--fixed_residues_soluble",
+        type = str,
+        default = "",
+        help = "Provide fixed residues for soluble MPNN: A12 A13 A14 B2 B25"
+    )
+    parser.add_argument(
         "--bias_AA_per_residue",
         type = str,
         default = "",
@@ -104,7 +116,7 @@ def parse_args():
         help="Do not filter or restart for unbound contact residues at cycle 0",
     )
     parser.add_argument("--max_contact_filter_retries", default=6, type=int)
-    parser.add_argument("--contact_cutoff", default=15.0, type=float)
+    parser.add_argument("--contact_cutoff", default=4.5, type=float)
 
     parser.add_argument(
         "--alphafold_dir", default=os.path.expanduser("~/alphafold3"), type=str
@@ -130,13 +142,15 @@ def parse_args():
     parser.add_argument("--high_iptm_threshold", default=0.8, type=float)
     parser.add_argument("--high_plddt_threshold", default=0.8, type=float)
 
-    # Params for Partial Redesign: 
+    # Params for ScFv Partial Redesign: 
     # Reinitializing the sequence and template construction if do not meet desired contact threshold at cycle 0
     # (e.g., if fewer than 2 of the specified contact residues are contacted by the designed binder)
     parser.add_argument("--input_pdb_path", default = "", type=str, 
                         help = "Path to input PDB file for partial redesign mode.")
     parser.add_argument("--struc_fab_target_path", default = "", type=str, 
                         help = "Path to a PDB/CIF file containing the fab-target complex for partial redesign mode.")
+    parser.add_argument("--linker_start", default = 0,  type = int,
+                        help = "Index of the first residue of the linker to be used in constructing the single chain template for partial redesign")
     parser.add_argument("--linker_length", default = 20, type=int, 
                         help = "Length of the linker to be used in constructing the single chain template for partial redesign.")
     
