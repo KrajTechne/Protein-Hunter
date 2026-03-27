@@ -428,6 +428,9 @@ class Boltz2(LightningModule):
         binder_chain: str = "A",
         logmd: bool  = False,
         structure: Any = None,
+        linker_struc_bias: bool = False,
+        linker_start: int = 0,
+        linker_length: int = 0
     ) -> dict[str, Tensor]:
         with torch.set_grad_enabled(
             self.training and self.structure_prediction_training
@@ -522,6 +525,30 @@ class Boltz2(LightningModule):
                         random_factor = -negative_helix_constant * torch.rand(1).item()
                         z[:, i, i+4, :] = random_factor*z[:, i, i+4, :]
                         z[:, i+4, i, :] = random_factor*z[:, i+4, i, :]
+            
+            # Code change (Feb 20th) to control structure of linker
+            if linker_struc_bias:
+                seq_len = s.shape[1]
+                print("Seq_Length: ", seq_len)
+                binder_mask = feats['entity_id'] == chain_to_number[binder_chain]
+                #linker_start = 119
+                linker_end = linker_start + linker_length
+                print("Linker Start: ", linker_start)
+                print("Linker End: ", linker_end)
+                print("Linker Length: ", linker_length)
+                print("Negative Helix Constant: ", (-1 * negative_helix_constant))
+
+                for i in range(seq_len-4):
+                    # Check within binder and linker region
+                    # Initially, end_index is just linker_end but will seep into second domain being connected by linker 
+                    if binder_mask[0, i] == True and (linker_start <= i < (linker_end - 4)):
+                        random_factor =  (-1 * negative_helix_constant) * torch.rand(1).item()
+                        z[:, i, i+4, :] = random_factor * z[:, i, i+4, :]
+                        z[:, i+4, i, :] = random_factor * z[:, i+4, i, :]
+
+
+            
+
 
             pdistogram = self.distogram_module(z)
             dict_out = {
@@ -1090,8 +1117,10 @@ class Boltz2(LightningModule):
             for validator in self.validator_mapper.values():
                 # This will aggregate, compute and log all metrics
                 validator.on_epoch_end(model=self)
-
-    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0, randomly_kill_helix_feature: bool = False, negative_helix_constant: float = 0.1, binder_chain: str = "A", logmd: bool = False, structure: Any = None) -> dict:
+    
+    # Feb 20th: Changed predict_step to accept linker_struc_bias flag
+    def predict_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0, randomly_kill_helix_feature: bool = False, negative_helix_constant: float = 0.1, binder_chain: str = "A", logmd: bool = False, structure: Any = None,
+                     linker_struc_bias: bool = False, linker_start: int = 0, linker_length: int = 0) -> dict:
         try:
             out = self(
                 batch,
@@ -1105,6 +1134,9 @@ class Boltz2(LightningModule):
                 binder_chain=binder_chain,
                 logmd = logmd,
                 structure = structure,
+                linker_struc_bias = linker_struc_bias,
+                linker_start = linker_start,
+                linker_length = linker_length
             )
             pred_dict = {"exception": False}
             if "keys_dict_batch" in self.predict_args:
