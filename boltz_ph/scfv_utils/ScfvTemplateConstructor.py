@@ -135,7 +135,9 @@ class ScfvTemplateConstructor:
             seq_input = annotated_fab['light']['seq'] + ("X" * linker_length) + annotated_fab['heavy']['seq']
         else:
             raise ValueError("Invalid orientation. Must be either 'VH-VL' or 'VL-VH.")
-
+        
+        # 0. Create list of linker 1-indexed res pos to ensure always designable when sampling for additional fixed residues
+        linker_1_pos = [index + 1 for index, val in enumerate(seq_input) if val == "X"]
         # 1. Create the MPNN with Linker and Mask with Linker arrays
         mask_linker = np.zeros(linker_length)
         mask_fixed_linker = np.concatenate((
@@ -149,7 +151,7 @@ class ScfvTemplateConstructor:
         # If it is a fixed residue, it's design class is fixed. If not, design class is designable
         
         # Define dictionaries to store fixed and designable residues indices.
-        final_fixed_designable_dict = {'fixed': [], 'designable': []}
+        final_fixed_designable_dict = {'fixed': [], 'designable': [], 'linker': linker_1_pos}
         
         for index, val in enumerate(mask_fixed_linker):
             res_1pos = index + 1
@@ -312,6 +314,8 @@ class ScfvTemplateConstructor:
         # 3. Create Final Fixed and Designable Indices Dict & seq_input 
         final_fixed_designable_dict, seq_input = self.create_final_fixed_designable_dict(cys_indices_one_pos= cys_indices,
                                                                                          linker_length= linker_length)
+        # Add cys indices to dictionary to ensure always sampled for MPNN
+        final_fixed_designable_dict['cys'] = cys_indices
         # 4. Create single chain PDB file with linker
         self.create_sc_pdb_file(pdb_save_path= pdb_save_path, linker_length=linker_length)
         
