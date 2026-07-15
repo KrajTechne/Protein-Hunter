@@ -582,7 +582,7 @@ def design_sequence(
     chains_to_design="A",
     omit_AA="C",
     bias_AA="",
-    temperature=0.02,
+    temperature=0.1,
     return_logits=False,
     fixed_residues = "",
     model_weights_path = "",
