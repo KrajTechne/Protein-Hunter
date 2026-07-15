@@ -532,6 +532,33 @@ class ProteinHunter_Boltz:
             initial_seq = a.seq
         updated_seq = update_binder_sequence(initial_seq)
         print(f"Binder initial sequence length: {binder_length}")
+        #----- Try to sample or vary the number of fixed residues per cycle ------------------------ (May 15th, 2026)
+        scfv_constructor = ScfvTemplateConstructor(struc_fab_path= a.input_pdb_path, struc_fab_target_path = a.struc_fab_target_path, verbose = False)
+        pdb_save_path = a.template_path.replace(".cif", ".pdb")
+        seq_dict, seq_input, output_cif_path, sc_res_designable_dict, paratope_residues, bias_AA_json_path = scfv_constructor.create_protein_hunter_inputs(pdb_save_path= pdb_save_path, linker_length=a.linker_length)
+
+        residues_fixed = list(sc_res_designable_dict['fixed'])
+        residues_mutable = list(sc_res_designable_dict['designable'])
+        residues_cys = list(sc_res_designable_dict['cys'])
+        residues_linker = list(sc_res_designable_dict['linker'])
+        residues_mutable_always = residues_cys + residues_linker
+        # Ensure Cysteine & Linker residues are never included in pool of additional potential fixed residues
+        residues_fixed_potential = list(set(residues_mutable) - set(residues_mutable_always)) 
+        residues_fixed_potential_num = len(residues_fixed_potential)
+        # Decide number of initially mutable residues to be added to fixed residues
+        min_residues = int(len(residues_fixed_potential) * (0.35)) # Min = 0.35
+        max_residues = int(len(residues_fixed_potential) * (0.50)) # Max = 0.50
+        num_residues_add_to_fixed = random.randint(min_residues, max_residues)  
+        added_fixed_residues = random.sample(residues_fixed_potential, num_residues_add_to_fixed)
+        residues_fixed.extend(added_fixed_residues)
+        residues_mutable = [res for res in residues_mutable if res not in residues_fixed]
+        print("Mutable Residues for Current Cycle: ", residues_mutable)
+
+        # Update original fixed residues soluble from passed argument
+        a.fixed_residues_soluble = ' '.join([f"A{res}" for res in residues_fixed])
+        a.fixed_residues_protein = a.fixed_residues_soluble
+
+        # End of code snippet to sample or vary the number of fixed residues per cycle ----------------- (May 15th, 2026)
 
         # --- Cycle 0 structure prediction, with contact filtering check ---
         contact_filter_attempt = 0
