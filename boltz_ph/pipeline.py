@@ -556,7 +556,9 @@ class ProteinHunter_Boltz:
 
         # Update original fixed residues soluble from passed argument
         a.fixed_residues_soluble = ' '.join([f"A{res}" for res in residues_fixed])
-        a.fixed_residues_protein = a.fixed_residues_soluble
+        a.fixed_residues_protein = a.fixed_residues_soluble if a.fixed_residues_protein != "" else ""
+        print("Fixed Soluble Residues: ", a.fixed_residues_soluble)
+        print("Fixed Protein Residues: ", a.fixed_residues_protein)
 
         # End of code snippet to sample or vary the number of fixed residues per cycle ----------------- (May 15th, 2026)
 
@@ -663,7 +665,7 @@ class ProteinHunter_Boltz:
         
         # Calculate ipsae
         pae_matrix = output['pae'][0]
-        cycle_0_ipsae_min, cycle_0_ipsae_max = calculate_ipsae_complex(pae_matrix = pae_matrix, len_binder = binder_length)
+        cycle_0_ipsae_min, cycle_0_ipsae_max = calculate_ipsae_complex_poc(pae_matrix = pae_matrix, len_binder = binder_length)
 
         run_metrics["cycle_0_iptm"] = cycle_0_iptm
         run_metrics["cycle_0_plddt"] = float(
@@ -809,7 +811,7 @@ class ProteinHunter_Boltz:
             
             # Calculate ipsae_min and ipsae_max
             pae_matrix = output['pae'][0]
-            current_ipsae_min, current_ipsae_max = calculate_ipsae_complex(pae_matrix = pae_matrix, len_binder = binder_length)
+            current_ipsae_min, current_ipsae_max = calculate_ipsae_complex_poc(pae_matrix = pae_matrix, len_binder = binder_length)
 
             # Update best structure (only if alanine content is acceptable)
             if alanine_percentage <= 0.20 and current_iptm > best_iptm:

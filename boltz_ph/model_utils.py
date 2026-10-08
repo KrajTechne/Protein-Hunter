@@ -144,10 +144,10 @@ def binder_binds_contacts(pdb_path, binder_chain, target_chain, contact_residues
                                                       target_chain_id = target_chain, cutoff = cutoff)
     
     # Extract detected paratope and epitope indices from contact_information dictionary
-    actual_paratope_residues_str = contact_information['paratope_indices']
+    actual_paratope_residues_str = contact_information[f'paratope_indices_{target_chain}']
     actual_paratope_residues = [int(x) for x in actual_paratope_residues_str.split(",")]
     
-    actual_contact_residues_str = contact_information['epitope_indices']
+    actual_contact_residues_str = contact_information[f'epitope_indices_{target_chain}']
     actual_contact_residues = [int(x) for x in actual_contact_residues_str.split(",")]
     
     # Contact Check passes if >2 desired epitope residues are in detected epitope residues and likewise for paratope residues
